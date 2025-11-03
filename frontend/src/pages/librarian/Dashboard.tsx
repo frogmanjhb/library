@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import { CommentModal } from '../teacher/CommentModal';
 
 export const LibrarianDashboard = () => {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
