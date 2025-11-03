@@ -1,0 +1,49 @@
+═══════════════════════════════════════════════════════
+RAILWAY DEPLOYMENT CONFIGURATION (WORKING VERSION)
+═══════════════════════════════════════════════════════
+
+🔵 BACKEND SERVICE SETTINGS:
+─────────────────────────────
+
+In Railway Dashboard -> Backend Service -> Settings:
+
+Root Directory:
+backend
+
+Build Command:
+npm install && npx prisma generate --schema=./prisma/schema.prisma && npm run build
+
+Start Command:
+npm start
+
+
+🟢 FRONTEND SERVICE SETTINGS:
+──────────────────────────────
+
+In Railway Dashboard -> Frontend Service -> Settings:
+
+Root Directory:
+frontend
+
+Build Command:
+npm install && npm run build
+
+Start Command:
+npx serve -s dist -l $PORT
+
+
+═══════════════════════════════════════════════════════
+
+WHAT CHANGED:
+✅ Copied prisma folder INTO backend folder
+✅ Now using ./prisma/schema.prisma (inside backend)
+✅ Railway can find the schema because it's in the same folder
+
+═══════════════════════════════════════════════════════
+
+IMPORTANT NOTES:
+✅ Make sure to SAVE after changing each setting
+✅ After saving, Railway will auto-redeploy
+✅ Schema is now at: backend/prisma/schema.prisma
+
+═══════════════════════════════════════════════════════
