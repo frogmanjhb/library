@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { prisma } from '../lib/prisma';
+import { searchBookInfo } from '../services/bookSearch';
 
 const router = express.Router();
 
@@ -139,7 +140,7 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
     throw new AppError('Rating must be between 1 and 5', 400);
   }
 
-  // Create book
+  // Create book immediately with user-provided data
   const book = await prisma.book.create({
     data: {
       title,
@@ -167,6 +168,12 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
   const io = req.app.get('io');
   io.emit('book:logged', { bookId: book.id, userId: user.id });
   io.emit('leaderboard:update');
+
+  // Trigger asynchronous background search for word count and genre
+  // Don't await - let it run in the background
+  searchAndUpdateBook(book.id, title, author).catch((error) => {
+    console.error(`Failed to update book ${book.id} with search results:`, error);
+  });
 
   res.status(201).json(book);
 }));
@@ -237,6 +244,55 @@ router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
 
   res.json({ message: 'Book deleted successfully' });
 }));
+
+/**
+ * Background function to search for book information and update the book record
+ * Runs asynchronously after book is created
+ */
+async function searchAndUpdateBook(bookId: string, title: string, author: string): Promise<void> {
+  try {
+    console.log(`Searching for book info: ${title} by ${author}`);
+    const searchResults = await searchBookInfo(title, author);
+
+    // Get current book to merge genres
+    const currentBook = await prisma.book.findUnique({
+      where: { id: bookId },
+      select: { wordCount: true, genres: true },
+    });
+
+    // Only update if we found new information
+    const updateData: any = {};
+    
+    // Only update wordCount if we don't already have one or if search found one
+    if (searchResults.wordCount !== null && !currentBook?.wordCount) {
+      updateData.wordCount = searchResults.wordCount;
+    }
+    
+    // Merge genres: combine existing genres with search results, removing duplicates
+    if (searchResults.genres.length > 0) {
+      const existingGenres = currentBook?.genres || [];
+      const mergedGenres = [...new Set([...existingGenres, ...searchResults.genres])];
+      // Only update if we have new genres to add
+      if (mergedGenres.length > existingGenres.length) {
+        updateData.genres = mergedGenres;
+      }
+    }
+
+    // Only update if we have new data to add
+    if (Object.keys(updateData).length > 0) {
+      await prisma.book.update({
+        where: { id: bookId },
+        data: updateData,
+      });
+      console.log(`Updated book ${bookId} with search results:`, updateData);
+    } else {
+      console.log(`No additional information found for book ${bookId}`);
+    }
+  } catch (error: any) {
+    // Log error but don't throw - this is a background process
+    console.error(`Error updating book ${bookId} with search results:`, error.message);
+  }
+}
 
 export default router;
 
