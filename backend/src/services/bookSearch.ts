@@ -15,10 +15,15 @@ interface DuckDuckGoResponse {
 
 interface OpenLibraryBook {
   subject?: string[];
+  number_of_pages?: number;
+  first_publish_year?: number;
+  title?: string;
+  author_name?: string[];
 }
 
 interface OpenLibraryResponse {
   docs?: OpenLibraryBook[];
+  numFound?: number;
 }
 
 /**
@@ -37,62 +42,72 @@ export async function searchBookInfo(
   };
 
   try {
-    // Use DuckDuckGo Instant Answer API for book information
-    const searchQuery = `${title} ${author} book`;
-    const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(searchQuery)}&format=json&no_html=1&skip_disambig=1`;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
+    // First, try Open Library API - most reliable source for book metadata
     try {
-      const response = await fetch(ddgUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; LibraryTracker/1.0)',
-        },
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      console.log(`Searching Open Library for: "${title}" by ${author}`);
+      const olResults = await searchOpenLibraryForBookInfo(title, author);
+      if (olResults.wordCount) {
+        result.wordCount = olResults.wordCount;
+        console.log(`Found word count: ${olResults.wordCount}`);
       }
-
-      const data = (await response.json()) as DuckDuckGoResponse;
-
-      // Try to extract genre from AbstractText or related topics
-      if (data.AbstractText) {
-        const abstract = data.AbstractText.toLowerCase();
-        result.genres = extractGenresFromText(abstract);
+      if (olResults.genres.length > 0) {
+        result.genres = olResults.genres;
+        console.log(`Found genres: ${olResults.genres.join(', ')}`);
       }
+    } catch (error) {
+      console.error('Open Library search failed:', error);
+    }
 
-      // Try to get more detailed information via web search fallback
-      if (!result.wordCount || result.genres.length === 0) {
+    // If we still don't have word count, try DuckDuckGo Instant Answer API
+    if (!result.wordCount) {
+      try {
+        const searchQuery = `${title} ${author} book`;
+        const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(searchQuery)}&format=json&no_html=1&skip_disambig=1`;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        try {
+          const response = await fetch(ddgUrl, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; LibraryTracker/1.0)',
+            },
+          });
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const data = (await response.json()) as DuckDuckGoResponse;
+
+            // Try to extract genre from AbstractText
+            if (data.AbstractText && result.genres.length === 0) {
+              const abstract = data.AbstractText.toLowerCase();
+              result.genres = extractGenresFromText(abstract);
+            }
+          }
+        } catch (fetchError: any) {
+          if (fetchError.name !== 'AbortError') {
+            console.error(`DuckDuckGo search error:`, fetchError.message);
+          }
+        }
+      } catch (error) {
+        // Silently fail
+      }
+    }
+
+    // If we still don't have word count, try web search fallback
+    if (!result.wordCount) {
+      try {
         const webResults = await searchWebForBookInfo(title, author);
         if (webResults.wordCount) {
           result.wordCount = webResults.wordCount;
         }
-        if (webResults.genres.length > 0) {
-          result.genres = [...new Set([...result.genres, ...webResults.genres])];
-        }
-      }
-    } catch (fetchError: any) {
-      if (fetchError.name === 'AbortError') {
-        console.log(`Book search timed out for: ${title} by ${author}`);
-      } else {
-        console.error(`Book search error for ${title} by ${author}:`, fetchError.message);
-      }
-    }
-
-    // Fallback: Try Open Library API for genre information
-    if (result.genres.length === 0) {
-      try {
-        const olGenres = await searchOpenLibrary(title, author);
-        if (olGenres.length > 0) {
-          result.genres = olGenres;
+        if (webResults.genres.length > 0 && result.genres.length === 0) {
+          result.genres = webResults.genres;
         }
       } catch (error) {
-        console.error('Open Library search failed:', error);
+        // Silently fail
       }
     }
   } catch (error: any) {
@@ -180,49 +195,90 @@ async function searchWebForBookInfo(
 }
 
 /**
- * Search Open Library API for genre information
+ * Search Open Library API for book information (word count and genre)
  */
-async function searchOpenLibrary(
+async function searchOpenLibraryForBookInfo(
   title: string,
   author: string
-): Promise<string[]> {
+): Promise<BookSearchResult> {
+  const result: BookSearchResult = {
+    wordCount: null,
+    genres: [],
+  };
+
   try {
-    const searchQuery = `title:${title} author:${author}`;
-    const searchUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(searchQuery)}&limit=1`;
+    // Try multiple search strategies
+    const searchQueries = [
+      `title:${title} author:${author}`,
+      `"${title}" "${author}"`,
+      `${title} ${author}`,
+    ];
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    for (const searchQuery of searchQueries) {
+      const searchUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(searchQuery)}&limit=3`;
 
-    try {
-      const response = await fetch(searchUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; LibraryTracker/1.0)',
-        },
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-      clearTimeout(timeoutId);
+      try {
+        const response = await fetch(searchUrl, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; LibraryTracker/1.0)',
+          },
+        });
 
-      if (response.ok) {
-        const data = (await response.json()) as OpenLibraryResponse;
-        if (data.docs && data.docs.length > 0) {
-          const book = data.docs[0];
-          if (book.subject) {
-            // Open Library returns subjects, which often include genres
-            return extractGenresFromSubjects(book.subject);
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const data = (await response.json()) as OpenLibraryResponse;
+          if (data.docs && data.docs.length > 0) {
+            // Find the best match (exact title/author match)
+            const bestMatch = data.docs.find((book) => {
+              const bookTitle = book.title?.toLowerCase() || '';
+              const bookAuthors = book.author_name?.map(a => a.toLowerCase()) || [];
+              const searchTitle = title.toLowerCase();
+              const searchAuthor = author.toLowerCase();
+              
+              const titleMatches = bookTitle.includes(searchTitle) || searchTitle.includes(bookTitle);
+              const authorMatches = bookAuthors.some(a => a.includes(searchAuthor) || searchAuthor.includes(a));
+              
+              return titleMatches && authorMatches;
+            }) || data.docs[0];
+
+            // Extract genres from subjects
+            if (bestMatch.subject) {
+              result.genres = extractGenresFromSubjects(bestMatch.subject);
+            }
+
+            // Estimate word count from page count (average 250-300 words per page)
+            if (bestMatch.number_of_pages && !result.wordCount) {
+              const pages = bestMatch.number_of_pages;
+              // Estimate: 250 words per page for fiction, 300 for non-fiction
+              // Using 275 as a middle ground
+              const estimatedWords = pages * 275;
+              result.wordCount = estimatedWords;
+              console.log(`Estimated word count from Open Library: ${pages} pages = ${estimatedWords} words`);
+            }
+
+            // If we found both, we're done
+            if (result.wordCount && result.genres.length > 0) {
+              break;
+            }
           }
         }
-      }
-    } catch (fetchError: any) {
-      if (fetchError.name !== 'AbortError') {
-        console.error('Open Library API error:', fetchError.message);
+      } catch (fetchError: any) {
+        if (fetchError.name !== 'AbortError') {
+          console.error('Open Library API error:', fetchError.message);
+        }
+        // Continue to next search query
       }
     }
   } catch (error) {
     // Silently fail
   }
 
-  return [];
+  return result;
 }
 
 /**
