@@ -8,6 +8,19 @@ interface BookSearchResult {
   genres: string[];
 }
 
+interface DuckDuckGoResponse {
+  AbstractText?: string;
+  RelatedTopics?: Array<{ Text?: string }>;
+}
+
+interface OpenLibraryBook {
+  subject?: string[];
+}
+
+interface OpenLibraryResponse {
+  docs?: OpenLibraryBook[];
+}
+
 /**
  * Searches for book information (word count and genre) using web search
  * @param title - Book title
@@ -45,7 +58,7 @@ export async function searchBookInfo(
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as DuckDuckGoResponse;
 
       // Try to extract genre from AbstractText or related topics
       if (data.AbstractText) {
@@ -191,7 +204,7 @@ async function searchOpenLibrary(
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        const data = await response.json();
+        const data = (await response.json()) as OpenLibraryResponse;
         if (data.docs && data.docs.length > 0) {
           const book = data.docs[0];
           if (book.subject) {
