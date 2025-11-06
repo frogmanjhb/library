@@ -58,6 +58,19 @@ export async function searchBookInfo(
       console.error('Open Library search failed:', error);
     }
 
+    // If we still don't have word count, try ReadingLength.com (secondary scraper)
+    if (!result.wordCount) {
+      try {
+        const readingLengthWordCount = await fetchWordCountFromReadingLength(title, author);
+        if (readingLengthWordCount) {
+          result.wordCount = readingLengthWordCount;
+          console.log(`ReadingLength word count: ${readingLengthWordCount}`);
+        }
+      } catch (error: any) {
+        console.error('ReadingLength scrape failed:', error?.message || error);
+      }
+    }
+
     // If we still don't have word count, try DuckDuckGo Instant Answer API
     if (!result.wordCount) {
       try {
@@ -149,37 +162,31 @@ async function searchWebForBookInfo(
 
       if (response.ok) {
         const html = await response.text();
-        
-        // Extract word count from text (look for various patterns)
-        // Patterns: "50,000 words", "50000 words", "50k words", "50 thousand words", "word count: 50000"
-        const wordCountPatterns = [
-          /(\d{1,3}(?:,\d{3})*)\s*(?:words?|word count)/i,
-          /(\d+)\s*(?:k|thousand)\s*words?/i,
-          /word\s*count[:\s]*(\d{1,3}(?:,\d{3})*)/i,
-          /approximately\s*(\d{1,3}(?:,\d{3})*)\s*words?/i,
-        ];
 
-        for (const pattern of wordCountPatterns) {
-          const match = html.match(pattern);
-          if (match) {
-            let wordCountStr = match[1].replace(/,/g, '');
-            // Handle "k" notation (e.g., "50k" = 50000)
-            if (match[0].toLowerCase().includes('k') && !match[0].toLowerCase().includes('thousand')) {
-              wordCountStr = (parseInt(wordCountStr, 10) * 1000).toString();
-            }
-            const wordCount = parseInt(wordCountStr, 10);
-            if (!isNaN(wordCount) && wordCount > 0 && wordCount < 10000000) {
-              // Reasonable upper limit
-              result.wordCount = wordCount;
+        // Try to extract word count directly from SERP text/snippets
+        const serpWordCount = extractWordCountFromHtml(html);
+        if (serpWordCount) {
+          result.wordCount = serpWordCount;
+          console.log(`DuckDuckGo SERP word count: ${serpWordCount}`);
+        }
+
+        // Extract genres from snippets (fallback)
+        const serpGenres = extractGenresFromText(html);
+        if (serpGenres.length > 0 && result.genres.length === 0) {
+          result.genres = serpGenres;
+        }
+
+        // If still missing word count, follow top organic results and inspect their content
+        if (!result.wordCount) {
+          const candidateUrls = extractDuckDuckGoResultUrls(html);
+          for (const url of candidateUrls) {
+            const pageWordCount = await fetchWordCountFromUrl(url);
+            if (pageWordCount) {
+              result.wordCount = pageWordCount;
+              console.log(`DuckDuckGo result word count from ${url}: ${pageWordCount}`);
               break;
             }
           }
-        }
-
-        // Extract genres from text
-        const genres = extractGenresFromText(html);
-        if (genres.length > 0) {
-          result.genres = genres;
         }
       }
     } catch (fetchError: any) {
@@ -377,5 +384,267 @@ function extractGenresFromSubjects(subjects: string[]): string[] {
   }
 
   return genres.slice(0, 5);
+}
+
+/**
+ * Extract word count from an HTML string
+ */
+function extractWordCountFromHtml(html: string): number | null {
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  return extractWordCountFromText(text);
+}
+
+/**
+ * Apply multiple heuristics to extract a word count from plain text snippets
+ */
+function extractWordCountFromText(text: string): number | null {
+  const patterns: RegExp[] = [
+    /word\s*count\s*[:\-]?\s*(\d[\d,.]*)/i,
+    /about\s*(\d[\d,.]*)\s*words?/i,
+    /approximately\s*(\d[\d,.]*)\s*words?/i,
+    /(?:is|has|contains|totals?)\s*(\d[\d,.]*)\s*words?/i,
+    /(\d[\d,.]*)\s*(?:words?)(?:\s*(?:long|novel|book|story))?/i,
+    /(\d+(?:\.\d+)?)\s*(?:million|m)\s*words?/i,
+    /(\d+(?:\.\d+)?)\s*(?:thousand|k)\s*words?/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match && match[1]) {
+      let value = parseFloat(match[1].replace(/,/g, ''));
+      if (Number.isNaN(value)) {
+        continue;
+      }
+
+      const lower = match[0].toLowerCase();
+      if (lower.includes('million') || /\bm\b/.test(lower)) {
+        value *= 1_000_000;
+      } else if (lower.includes('thousand') || /\bk\b/.test(lower)) {
+        value *= 1_000;
+      }
+
+      if (value >= 1_000 && value <= 15_000_000) {
+        return Math.round(value);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract top organic result URLs from the DuckDuckGo HTML response
+ */
+function extractDuckDuckGoResultUrls(html: string): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  const matches = html.matchAll(/href="https:\/\/duckduckgo\.com\/l\/?\?uddg=([^"&]+)"/gi);
+
+  for (const match of matches) {
+    if (!match[1]) continue;
+
+    try {
+      const decoded = decodeURIComponent(match[1]);
+      if (!decoded.startsWith('http')) {
+        continue;
+      }
+
+      const normalized = decoded.split('&', 1)[0];
+      const url = normalized;
+      if (shouldSkipUrl(url) || seen.has(url)) {
+        continue;
+      }
+
+      seen.add(url);
+      urls.push(url);
+
+      if (urls.length >= 5) {
+        break;
+      }
+    } catch (error) {
+      // Ignore decoding errors
+    }
+  }
+
+  return urls;
+}
+
+/**
+ * Fetch a page and attempt to extract a word count from its contents
+ */
+async function fetchWordCountFromUrl(url: string): Promise<number | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; LibraryTracker/1.0)',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('text/html')) {
+      return null;
+    }
+
+    const html = await response.text();
+    return extractWordCountFromHtml(html);
+  } catch (error: any) {
+    if (error?.name !== 'AbortError') {
+      console.error(`Failed to fetch ${url}:`, error.message || error);
+    }
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Skip URLs that are unlikely to provide word counts (e.g., commerce sites)
+ */
+function shouldSkipUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname;
+    const skipDomains = [
+      'amazon.',
+      'audible.',
+      'barnesandnoble.',
+      'target.',
+      'walmart.',
+      'books.google.',
+      'play.google.',
+      'bing.com',
+      'yahoo.com',
+      'ebay.',
+    ];
+
+    return skipDomains.some((domain) => hostname.includes(domain));
+  } catch (error) {
+    return true;
+  }
+}
+
+/**
+ * Fetch word count data from ReadingLength.com (if available)
+ */
+async function fetchWordCountFromReadingLength(title: string, author: string): Promise<number | null> {
+  // Build a search query combining title and author for better accuracy
+  const query = `${title} ${author}`.trim();
+  const searchUrl = `https://www.readinglength.com/search?q=${encodeURIComponent(query)}`;
+
+  const searchHtml = await fetchReadingLengthPage(searchUrl);
+  if (!searchHtml) {
+    return null;
+  }
+
+  const titleSlug = extractReadingLengthTitleSlug(searchHtml);
+  if (!titleSlug) {
+    return null;
+  }
+
+  const detailUrl = `https://www.readinglength.com${titleSlug}`;
+  const detailHtml = await fetchReadingLengthPage(detailUrl);
+  if (!detailHtml) {
+    return null;
+  }
+
+  const wordCount = extractWordCountFromHtml(detailHtml);
+  if (wordCount) {
+    return wordCount;
+  }
+
+  // Some ReadingLength pages display page count; convert to estimated words
+  const pageCount = extractPageCountFromReadingLength(detailHtml);
+  if (pageCount) {
+    return Math.round(pageCount * 275);
+  }
+
+  return null;
+}
+
+async function fetchReadingLengthPage(url: string): Promise<string | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; LibraryTracker/1.0)',
+        Accept: 'text/html,application/xhtml+xml',
+        Referer: 'https://www.readinglength.com/',
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('text/html')) {
+      return null;
+    }
+
+    return await response.text();
+  } catch (error: any) {
+    if (error?.name !== 'AbortError') {
+      console.error(`ReadingLength request failed for ${url}:`, error?.message || error);
+    }
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function extractReadingLengthTitleSlug(html: string): string | null {
+  // ReadingLength search results typically include links like /title/<slug>
+  const linkRegex = /href="(\/title\/[^"]+)"/gi;
+  const matches = html.matchAll(linkRegex);
+
+  for (const match of matches) {
+    const href = match[1];
+    if (!href) continue;
+    if (href.startsWith('/title/')) {
+      return href.split('?')[0];
+    }
+  }
+
+  return null;
+}
+
+function extractPageCountFromReadingLength(html: string): number | null {
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ');
+
+  // Look for "XX pages" or "XX page"
+  const pagePattern = /(\d{1,4})\s+pages?/i;
+  const match = pagePattern.exec(text);
+  if (match) {
+    const pages = parseInt(match[1], 10);
+    if (!Number.isNaN(pages) && pages > 0 && pages < 5000) {
+      return pages;
+    }
+  }
+
+  return null;
 }
 
