@@ -244,7 +244,10 @@ router.patch('/:id/verification', requireAuth, requireLibrarian, asyncHandler(as
   const user = req.user!;
 
   const statusValue = status?.toString().toUpperCase();
-  if (!statusValue || ![BookStatus.APPROVED, BookStatus.REJECTED].includes(statusValue as BookStatus)) {
+  if (
+    !statusValue ||
+    (statusValue !== BookStatus.APPROVED && statusValue !== BookStatus.REJECTED)
+  ) {
     throw new AppError('Status must be APPROVED or REJECTED', 400);
   }
 
@@ -256,7 +259,8 @@ router.patch('/:id/verification', requireAuth, requireLibrarian, asyncHandler(as
     throw new AppError('Book not found', 404);
   }
 
-  const targetStatus = statusValue as BookStatus;
+  const targetStatus =
+    statusValue === BookStatus.APPROVED ? BookStatus.APPROVED : BookStatus.REJECTED;
   const verificationNote = note?.trim() || null;
   const now = new Date();
 
