@@ -12,6 +12,8 @@ interface Book {
   lexileLevel?: number;
   wordCount?: number;
   createdAt: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  verificationNote?: string | null;
   user: {
     name: string;
     email: string;
@@ -32,6 +34,21 @@ export const BookLogTable: React.FC<BookLogTableProps> = ({
   onCommentClick,
   showStudent = true 
 }) => {
+  const STATUS_STYLES: Record<Book['status'], { label: string; className: string }> = {
+    PENDING: {
+      label: 'Pending',
+      className: 'bg-amber-100 text-amber-800 border border-amber-200',
+    },
+    APPROVED: {
+      label: 'Approved',
+      className: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+    },
+    REJECTED: {
+      label: 'Rejected',
+      className: 'bg-rose-100 text-rose-800 border border-rose-200',
+    },
+  };
+
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }).map((_, i) => (
       <Star
@@ -59,6 +76,7 @@ export const BookLogTable: React.FC<BookLogTableProps> = ({
             <tr className="border-b">
               <th className="text-left p-4 font-semibold">Title</th>
               <th className="text-left p-4 font-semibold">Author</th>
+              <th className="text-left p-4 font-semibold">Status</th>
               {showStudent && <th className="text-left p-4 font-semibold">Student</th>}
               <th className="text-left p-4 font-semibold">Rating</th>
               <th className="text-left p-4 font-semibold">Lexile</th>
@@ -81,6 +99,18 @@ export const BookLogTable: React.FC<BookLogTableProps> = ({
                   </div>
                 </td>
                 <td className="p-4 text-sm">{book.author}</td>
+                  <td className="p-4">
+                    <div className="flex flex-col gap-1">
+                      <Badge className={`w-fit text-[11px] font-semibold ${STATUS_STYLES[book.status].className}`}>
+                        {STATUS_STYLES[book.status].label}
+                      </Badge>
+                      {book.verificationNote && (
+                        <span className="text-[11px] text-muted-foreground line-clamp-2">
+                          {book.verificationNote}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                 {showStudent && (
                   <td className="p-4">
                     <div>

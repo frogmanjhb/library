@@ -16,6 +16,12 @@ enum Role {
   LIBRARIAN
 }
 
+enum BookStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -28,6 +34,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   books         Book[]
+  verifiedBooks Book[] @relation("BookVerifiers")
   points        Point?
   announcements Announcement[]
   comments      Comment[]
@@ -49,16 +56,23 @@ model Book {
   genres      String[]
   coverUrl    String?
   userId      String
+  status      BookStatus @default(PENDING)
+  verificationNote String?
+  verifiedAt  DateTime?
+  verifiedById String?
+  pointsAwarded Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comments Comment[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verifiedBy  User?     @relation("BookVerifiers", fields: [verifiedById], references: [id])
+  comments    Comment[]
 
   @@index([userId])
   @@index([createdAt])
   @@index([rating])
   @@index([lexileLevel])
+  @@index([status])
 }
 
 model Point {

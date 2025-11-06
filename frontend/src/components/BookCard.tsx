@@ -16,6 +16,13 @@ interface BookCardProps {
     coverUrl?: string;
     genres?: string[];
     createdAt: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    verificationNote?: string | null;
+    verifiedAt?: string | null;
+    verifiedBy?: {
+      name: string;
+      email: string;
+    } | null;
   };
   onEdit?: (book: any) => void;
   onDelete?: (bookId: string) => void;
@@ -28,6 +35,21 @@ export const BookCard: React.FC<BookCardProps> = ({
   onDelete, 
   showActions = false 
 }) => {
+  const STATUS_STYLES: Record<BookCardProps['book']['status'], { label: string; className: string }> = {
+    PENDING: {
+      label: 'Pending Verification',
+      className: 'bg-amber-100 text-amber-800 border border-amber-200',
+    },
+    APPROVED: {
+      label: 'Verified',
+      className: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+    },
+    REJECTED: {
+      label: 'Needs Review',
+      className: 'bg-rose-100 text-rose-800 border border-rose-200',
+    },
+  };
+
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }).map((_, i) => (
       <Star
@@ -49,10 +71,17 @@ export const BookCard: React.FC<BookCardProps> = ({
     >
       <Card className="overflow-hidden hover:shadow-lg transition-shadow">
         <CardHeader className="pb-3">
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <CardTitle className="text-lg line-clamp-1">{book.title}</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">{book.author}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-lg line-clamp-1">{book.title}</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">{book.author}</p>
+                </div>
+                <Badge className={`text-xs font-semibold ${STATUS_STYLES[book.status].className}`}>
+                  {STATUS_STYLES[book.status].label}
+                </Badge>
+              </div>
             </div>
             {book.coverUrl && (
               <img
@@ -118,6 +147,31 @@ export const BookCard: React.FC<BookCardProps> = ({
               </div>
             )}
           </div>
+
+          {(book.status !== 'APPROVED' || book.verificationNote) && (
+            <div
+              className={`mt-4 rounded-md px-3 py-2 text-xs ${
+                book.status === 'APPROVED'
+                  ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : book.status === 'REJECTED'
+                    ? 'border border-rose-200 bg-rose-50 text-rose-800'
+                    : 'border border-amber-200 bg-amber-50 text-amber-800'
+              }`}
+            >
+              {book.verificationNote
+                ? book.verificationNote
+                : book.status === 'REJECTED'
+                  ? 'A librarian has requested updates for this entry. Please review and resubmit.'
+                  : 'Awaiting librarian verification.'}
+            </div>
+          )}
+
+          {book.status === 'APPROVED' && book.verifiedAt && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Verified on {new Date(book.verifiedAt).toLocaleDateString()}
+              {book.verifiedBy?.name ? ` by ${book.verifiedBy.name}` : ''}
+            </p>
+          )}
         </CardContent>
       </Card>
     </motion.div>

@@ -14,6 +14,7 @@ export const LibrarianDashboard = () => {
   const { logout } = useAuth();
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
+  const [pendingBooks, setPendingBooks] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,13 +36,15 @@ export const LibrarianDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [booksRes, announcementsRes] = await Promise.all([
+      const [booksRes, pendingRes, announcementsRes] = await Promise.all([
         api.get('/api/books'),
+        api.get('/api/books', { params: { status: 'PENDING' } }),
         api.get('/api/announcements'),
       ]);
 
       setBooks(booksRes.data);
       setFilteredBooks(booksRes.data);
+      setPendingBooks(pendingRes.data);
       setAnnouncements(announcementsRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -102,6 +105,31 @@ export const LibrarianDashboard = () => {
     }
   };
 
+  const handleVerifyBook = async (bookId: string, status: 'APPROVED' | 'REJECTED') => {
+    try {
+      let note: string | undefined;
+      if (status === 'REJECTED') {
+        const reason = window.prompt('Please provide feedback for the student before rejecting this book.');
+        if (reason === null || !reason.trim()) {
+          alert('Feedback is required to reject a book.');
+          return;
+        }
+        note = reason.trim();
+      } else {
+        const optionalNote = window.prompt('Optional message to the student (press Cancel to skip).');
+        if (optionalNote && optionalNote.trim()) {
+          note = optionalNote.trim();
+        }
+      }
+
+      await api.patch(`/api/books/${bookId}/verification`, { status, note });
+      await fetchData();
+    } catch (error) {
+      console.error('Error updating verification status:', error);
+      alert('Failed to update verification status. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -141,7 +169,7 @@ export const LibrarianDashboard = () => {
         <AnnouncementBanner announcements={announcements} />
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -150,6 +178,17 @@ export const LibrarianDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">{books.length}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Pending Verification
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-amber-600">{pendingBooks.length}</div>
             </CardContent>
           </Card>
 
@@ -195,6 +234,14 @@ export const LibrarianDashboard = () => {
         <Tabs defaultValue="books" className="space-y-6">
           <TabsList>
             <TabsTrigger value="books">All Books</TabsTrigger>
+            <TabsTrigger value="verification">
+              Verification Queue
+              {pendingBooks.length > 0 && (
+                <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1 text-[11px] font-semibold text-white">
+                  {pendingBooks.length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="announcements">Announcements</TabsTrigger>
           </TabsList>
 
@@ -263,6 +310,93 @@ export const LibrarianDashboard = () => {
                 showStudent={true}
               />
             </div>
+          </TabsContent>
+
+          <TabsContent value="verification">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Verification</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {pendingBooks.length === 0 ? (
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 p-6 text-center text-emerald-800">
+                    All caught up! There are no books waiting for review.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="p-4 text-left font-semibold">Title</th>
+                          <th className="p-4 text-left font-semibold">Student</th>
+                          <th className="p-4 text-left font-semibold">Submitted</th>
+                          <th className="p-4 text-left font-semibold">Rating</th>
+                          <th className="p-4 text-left font-semibold">Reflection</th>
+                          <th className="p-4 text-left font-semibold">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingBooks.map((book: any) => (
+                          <tr key={book.id} className="border-b hover:bg-gray-50">
+                            <td className="p-4 align-top">
+                              <div>
+                                <p className="font-semibold">{book.title}</p>
+                                <p className="text-xs text-muted-foreground">{book.author}</p>
+                              </div>
+                            </td>
+                            <td className="p-4 align-top">
+                              <div>
+                                <p className="text-sm font-medium">{book.user?.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {book.user?.grade
+                                    ? `Grade ${book.user.grade}${book.user?.class ?? ''}`
+                                    : 'No class assigned'}
+                                </p>
+                              </div>
+                            </td>
+                            <td className="p-4 align-top text-sm">
+                              {new Date(book.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="p-4 align-top text-sm">
+                              {book.rating} / 5
+                            </td>
+                            <td className="p-4 align-top text-sm max-w-xs">
+                              <p className="line-clamp-3">
+                                {book.comment || 'No reflection provided.'}
+                              </p>
+                            </td>
+                            <td className="p-4 align-top">
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleVerifyBook(book.id, 'APPROVED')}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleVerifyBook(book.id, 'REJECTED')}
+                                >
+                                  Reject
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setSelectedBook(book.id)}
+                                >
+                                  View Details
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="announcements">

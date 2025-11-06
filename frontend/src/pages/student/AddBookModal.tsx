@@ -102,6 +102,11 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
   const formContent = (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {!book && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Your log will show as pending until a librarian reviews it. Points are added after approval.
+        </div>
+      )}
       <div>
         <label className="block text-sm font-medium mb-1">
           Book Title <span className="text-red-500">*</span>
@@ -195,7 +200,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
       <div className="flex gap-2 pt-4">
         <Button type="submit" disabled={loading} className="flex-1">
-          {loading ? 'Saving...' : book ? 'Update Book' : 'Add Book (+10 points)'}
+          {loading ? 'Saving...' : book ? 'Update Book' : 'Submit for Verification'}
         </Button>
         {!inline && (
           <Button type="button" variant="outline" onClick={onClose}>

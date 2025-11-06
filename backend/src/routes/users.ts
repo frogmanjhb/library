@@ -1,4 +1,5 @@
 import express from 'express';
+import { BookStatus } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { prisma } from '../lib/prisma';
@@ -23,17 +24,17 @@ router.get('/:id/stats', requireAuth, asyncHandler(async (req, res) => {
 
   const [books, points, totalWords, avgLexile] = await Promise.all([
     prisma.book.count({
-      where: { userId: id },
+      where: { userId: id, status: BookStatus.APPROVED },
     }),
     prisma.point.findUnique({
       where: { userId: id },
     }),
     prisma.book.aggregate({
-      where: { userId: id },
+      where: { userId: id, status: BookStatus.APPROVED },
       _sum: { wordCount: true },
     }),
     prisma.book.aggregate({
-      where: { userId: id, lexileLevel: { not: null } },
+      where: { userId: id, status: BookStatus.APPROVED, lexileLevel: { not: null } },
       _avg: { lexileLevel: true },
     }),
   ]);

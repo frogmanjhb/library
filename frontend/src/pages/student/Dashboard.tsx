@@ -23,6 +23,13 @@ interface Book {
   coverUrl?: string;
   genres?: string[];
   createdAt: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  verificationNote?: string | null;
+  verifiedAt?: string | null;
+  verifiedBy?: {
+    name: string;
+    email: string;
+  } | null;
 }
 
 export const StudentDashboard = () => {
@@ -86,6 +93,9 @@ export const StudentDashboard = () => {
     setEditingBook(null);
     fetchData();
   };
+
+  const pendingCount = books.filter((b) => b.status === 'PENDING').length;
+  const rejectedCount = books.filter((b) => b.status === 'REJECTED').length;
 
   if (loading) {
     return (
@@ -198,12 +208,29 @@ export const StudentDashboard = () => {
               </Button>
             </div>
 
+            {(pendingCount > 0 || rejectedCount > 0) && (
+              <div className="space-y-2 mb-4">
+                {pendingCount > 0 && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    You have {pendingCount} book{pendingCount > 1 ? 's' : ''} awaiting librarian verification.
+                    You will earn points once they are approved.
+                  </div>
+                )}
+                {rejectedCount > 0 && (
+                  <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                    {rejectedCount} book{rejectedCount > 1 ? 's need' : ' needs'} updates based on librarian feedback.
+                    Open the card to see notes and resubmit when ready.
+                  </div>
+                )}
+              </div>
+            )}
+
             {books.length === 0 ? (
               <Card className="p-12 text-center">
                 <BookOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-xl font-semibold mb-2">No books yet!</h3>
                 <p className="text-muted-foreground mb-4">
-                  Start logging the books you've read to earn points
+                  Start logging the books you've read to earn points once they are approved by the librarian.
                 </p>
                 <Button onClick={handleAddBook}>
                   <Plus className="w-4 h-4 mr-2" />

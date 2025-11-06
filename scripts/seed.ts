@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient, Role, BookStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -120,6 +120,11 @@ async function main() {
       const rating = Math.floor(Math.random() * 2) + 4; // 4-5 stars mostly
       const comment = sampleComments[Math.floor(Math.random() * sampleComments.length)];
 
+      const isPending = Math.random() < 0.2;
+      const verificationNote = !isPending && Math.random() < 0.3
+        ? 'Great reflection - keep it up!'
+        : null;
+
       await prisma.book.create({
         data: {
           title: bookData.title,
@@ -131,15 +136,22 @@ async function main() {
           ageRange: `${student.grade}-${student.grade + 2}`,
           genres: ['Fiction', 'Adventure'],
           userId: student.id,
+          status: isPending ? BookStatus.PENDING : BookStatus.APPROVED,
+          verificationNote,
+          verifiedAt: isPending ? null : new Date(),
+          verifiedById: isPending ? null : librarian.id,
+          pointsAwarded: !isPending,
           createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000), // Random date within last 30 days
         },
       });
 
-      // Add points (10 per book)
-      await prisma.point.update({
-        where: { userId: student.id },
-        data: { totalPoints: { increment: 10 } },
-      });
+      // Add points (10 per approved book)
+      if (!isPending) {
+        await prisma.point.update({
+          where: { userId: student.id },
+          data: { totalPoints: { increment: 10 } },
+        });
+      }
 
       totalBooks++;
     }

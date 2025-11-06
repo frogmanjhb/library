@@ -1,4 +1,5 @@
 import express from 'express';
+import { BookStatus } from '@prisma/client';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { prisma } from '../lib/prisma';
@@ -9,9 +10,18 @@ const router = express.Router();
 // Get books with filtering based on role
 router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const user = req.user!;
-  const { userId, grade, class: className, sortBy = 'createdAt', order = 'desc' } = req.query;
+  const { userId, grade, class: className, sortBy = 'createdAt', order = 'desc', status } = req.query;
 
   let where: any = {};
+  const statusParam = Array.isArray(status) ? status[0] : status;
+
+  if (statusParam) {
+    const normalizedStatus = statusParam.toUpperCase();
+    if (!Object.values(BookStatus).includes(normalizedStatus as BookStatus)) {
+      throw new AppError('Invalid status filter', 400);
+    }
+    where.status = normalizedStatus as BookStatus;
+  }
 
   // Apply role-based filtering
   if (user.role === 'STUDENT') {
@@ -27,8 +37,14 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
       select: { id: true },
     });
     where.userId = { in: students.map(s => s.id) };
+    if (!statusParam) {
+      where.status = BookStatus.APPROVED;
+    }
+  } else if (!statusParam && user.role !== 'LIBRARIAN') {
+    // Default to approved for non-student, non-librarian roles
+    where.status = BookStatus.APPROVED;
   }
-  // Librarians see all books (no filter)
+  // Librarians see all books unless a status filter is supplied
 
   // Apply additional filters
   if (userId) where.userId = userId as string;
@@ -69,6 +85,13 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
           },
         },
       },
+      verifiedBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
     },
     orderBy: {
       [sortBy as string]: order as 'asc' | 'desc',
@@ -105,6 +128,13 @@ router.get('/:id', requireAuth, asyncHandler(async (req, res) => {
           },
         },
         orderBy: { createdAt: 'desc' },
+      },
+      verifiedBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
       },
     },
   });
@@ -153,14 +183,7 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
       genres: genres || [],
       coverUrl,
       userId: user.id,
-    },
-  });
-
-  // Add 10 points
-  await prisma.point.update({
-    where: { userId: user.id },
-    data: {
-      totalPoints: { increment: 10 },
+      status: BookStatus.PENDING,
     },
   });
 
@@ -214,6 +237,112 @@ router.put('/:id', requireAuth, asyncHandler(async (req, res) => {
   res.json(updatedBook);
 }));
 
+// Verify (approve/reject) a book
+router.patch('/:id/verification', requireAuth, requireLibrarian, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status, note } = req.body as { status?: string; note?: string };
+  const user = req.user!;
+
+  const statusValue = status?.toString().toUpperCase();
+  if (!statusValue || ![BookStatus.APPROVED, BookStatus.REJECTED].includes(statusValue as BookStatus)) {
+    throw new AppError('Status must be APPROVED or REJECTED', 400);
+  }
+
+  const existingBook = await prisma.book.findUnique({
+    where: { id },
+  });
+
+  if (!existingBook) {
+    throw new AppError('Book not found', 404);
+  }
+
+  const targetStatus = statusValue as BookStatus;
+  const verificationNote = note?.trim() || null;
+  const now = new Date();
+
+  let pointsAdjustment = 0;
+  const updateData: any = {
+    status: targetStatus,
+    verificationNote,
+    verifiedAt: now,
+    verifiedById: user.id,
+  };
+
+  if (targetStatus === BookStatus.APPROVED) {
+    if (!existingBook.pointsAwarded) {
+      pointsAdjustment = 10;
+    }
+    updateData.pointsAwarded = true;
+  } else {
+    if (existingBook.pointsAwarded) {
+      pointsAdjustment = -10;
+    }
+    updateData.pointsAwarded = false;
+  }
+
+  const updatedBook = await prisma.book.update({
+    where: { id },
+    data: updateData,
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          grade: true,
+          class: true,
+        },
+      },
+      comments: {
+        include: {
+          teacher: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+      verifiedBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  if (pointsAdjustment !== 0) {
+    if (pointsAdjustment > 0) {
+      await prisma.point.upsert({
+        where: { userId: updatedBook.userId },
+        update: {
+          totalPoints: { increment: pointsAdjustment },
+        },
+        create: {
+          userId: updatedBook.userId,
+          totalPoints: pointsAdjustment,
+        },
+      });
+    } else {
+      await prisma.point.updateMany({
+        where: { userId: updatedBook.userId },
+        data: {
+          totalPoints: { increment: pointsAdjustment },
+        },
+      });
+    }
+  }
+
+  const io = req.app.get('io');
+  io.emit('book:verified', { bookId: updatedBook.id, status: targetStatus });
+  io.emit('leaderboard:update');
+
+  res.json(updatedBook);
+}));
+
 // Delete book
 router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -232,10 +361,10 @@ router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
 
   await prisma.book.delete({ where: { id } });
 
-  // Deduct 10 points if deleted by the owner
-  if (book.userId === user.id) {
-    await prisma.point.update({
-      where: { userId: user.id },
+  // Deduct points if they were previously awarded
+  if (book.pointsAwarded) {
+    await prisma.point.updateMany({
+      where: { userId: book.userId },
       data: {
         totalPoints: { decrement: 10 },
       },

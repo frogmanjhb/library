@@ -1,4 +1,5 @@
 import express from 'express';
+import { BookStatus } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import { prisma } from '../lib/prisma';
@@ -20,8 +21,9 @@ router.get('/by-grade', requireAuth, asyncHandler(async (req, res) => {
     },
     include: {
       points: true,
-      _count: {
-        select: { books: true },
+      books: {
+        where: { status: BookStatus.APPROVED },
+        select: { id: true },
       },
     },
     orderBy: {
@@ -40,7 +42,7 @@ router.get('/by-grade', requireAuth, asyncHandler(async (req, res) => {
     grade: user.grade,
     class: user.class,
     totalPoints: user.points?.totalPoints || 0,
-    booksRead: user._count.books,
+    booksRead: user.books.length,
   }));
 
   res.json(formatted);
@@ -54,8 +56,9 @@ router.get('/school', requireAuth, asyncHandler(async (req, res) => {
     },
     include: {
       points: true,
-      _count: {
-        select: { books: true },
+      books: {
+        where: { status: BookStatus.APPROVED },
+        select: { id: true },
       },
     },
     orderBy: {
@@ -74,7 +77,7 @@ router.get('/school', requireAuth, asyncHandler(async (req, res) => {
     grade: user.grade,
     class: user.class,
     totalPoints: user.points?.totalPoints || 0,
-    booksRead: user._count.books,
+    booksRead: user.books.length,
   }));
 
   res.json(formatted);
@@ -98,6 +101,7 @@ router.get('/words', requireAuth, asyncHandler(async (req, res) => {
       const result = await prisma.book.aggregate({
         where: {
           userId: student.id,
+          status: BookStatus.APPROVED,
           wordCount: { not: null },
         },
         _sum: { wordCount: true },
@@ -148,6 +152,7 @@ router.get('/lexile', requireAuth, asyncHandler(async (req, res) => {
       const result = await prisma.book.aggregate({
         where: {
           userId: student.id,
+          status: BookStatus.APPROVED,
           lexileLevel: { not: null },
         },
         _avg: { lexileLevel: true },
