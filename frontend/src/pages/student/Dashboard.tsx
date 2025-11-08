@@ -257,7 +257,7 @@ export const StudentDashboard = () => {
                   >
                     <div className="flex flex-col items-center text-center gap-3">
                       <div className="relative">
-                        <div className="h-28 w-28 rounded-full bg-white/80 shadow-inner flex items-center justify-center overflow-hidden">
+                        <div className="h-28 w-28 rounded-3xl bg-white/80 shadow-inner flex items-center justify-center overflow-hidden">
                           <img
                             src={badge.imageSrc}
                             alt={`${badge.name} badge`}
@@ -323,7 +323,11 @@ export const StudentDashboard = () => {
           <TabsContent value="mybooks">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold">My Reading Log</h2>
-              <Button onClick={handleAddBook}>
+              <Button
+                onClick={handleAddBook}
+                size="lg"
+                className="gap-2 rounded-xl px-8 py-3 text-lg font-semibold shadow-lg shadow-primary/20 transition hover:scale-[1.02]"
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Book
               </Button>
@@ -353,7 +357,11 @@ export const StudentDashboard = () => {
                 <p className="text-muted-foreground mb-4">
                   Start logging the books you've read to earn points once they are approved by the librarian.
                 </p>
-                <Button onClick={handleAddBook}>
+                <Button
+                  onClick={handleAddBook}
+                  size="lg"
+                  className="gap-2 rounded-xl px-8 py-3 text-lg font-semibold shadow-lg shadow-primary/20 transition hover:scale-[1.02]"
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Log Your First Book
                 </Button>

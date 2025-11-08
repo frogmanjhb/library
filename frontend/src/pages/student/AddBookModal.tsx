@@ -150,52 +150,9 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Lexile Level
-          </label>
-          <Input
-            type="number"
-            value={formData.lexileLevel}
-            onChange={(e) => setFormData({ ...formData, lexileLevel: e.target.value })}
-            placeholder="e.g. 850"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Word Count
-          </label>
-          <Input
-            type="number"
-            value={formData.wordCount}
-            onChange={(e) => setFormData({ ...formData, wordCount: e.target.value })}
-            placeholder="e.g. 50000"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-1">
-          Genres (comma-separated)
-        </label>
-        <Input
-          value={formData.genres}
-          onChange={(e) => setFormData({ ...formData, genres: e.target.value })}
-          placeholder="e.g. Fantasy, Adventure"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-1">
-          Cover Image URL
-        </label>
-        <Input
-          value={formData.coverUrl}
-          onChange={(e) => setFormData({ ...formData, coverUrl: e.target.value })}
-          placeholder="https://..."
-        />
+      <div className="rounded-md border border-primary/10 bg-primary/5 px-4 py-3 text-sm text-primary/80">
+        We&apos;ll look up details like Lexile, word count, genres, and cover art automatically
+        after you submit. No need to fill those in manually.
       </div>
 
       <div className="flex gap-2 pt-4">
