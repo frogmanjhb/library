@@ -25,7 +25,7 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // Create announcement (librarian only)
-router.post('/', requireLibrarian, asyncHandler(async (req, res) => {
+router.post('/', requireAuth, requireLibrarian, asyncHandler(async (req, res) => {
   const user = req.user!;
   const { message } = req.body;
 
@@ -57,7 +57,7 @@ router.post('/', requireLibrarian, asyncHandler(async (req, res) => {
 }));
 
 // Update announcement (librarian only)
-router.put('/:id', requireLibrarian, asyncHandler(async (req, res) => {
+router.put('/:id', requireAuth, requireLibrarian, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { message } = req.body;
 
@@ -83,7 +83,7 @@ router.put('/:id', requireLibrarian, asyncHandler(async (req, res) => {
 }));
 
 // Delete announcement (librarian only)
-router.delete('/:id', requireLibrarian, asyncHandler(async (req, res) => {
+router.delete('/:id', requireAuth, requireLibrarian, asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   await prisma.announcement.delete({ where: { id } });
