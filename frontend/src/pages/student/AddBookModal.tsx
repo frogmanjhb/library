@@ -138,6 +138,31 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
         {renderStarSelector()}
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Lexile Level
+          </label>
+          <Input
+            type="number"
+            value={formData.lexileLevel}
+            onChange={(e) => setFormData({ ...formData, lexileLevel: e.target.value })}
+            placeholder="Enter Lexile Level"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            Word Count
+          </label>
+          <Input
+            type="number"
+            value={formData.wordCount}
+            onChange={(e) => setFormData({ ...formData, wordCount: e.target.value })}
+            placeholder="Enter Word Count"
+          />
+        </div>
+      </div>
+
       <div>
         <label className="block text-sm font-medium mb-1">
           Your Thoughts
