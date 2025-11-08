@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookLogTable } from '@/components/BookLogTable';
+import { AddBookModal } from '../student/AddBookModal';
 import { AnnouncementBanner } from '@/components/AnnouncementBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
@@ -17,6 +18,8 @@ export const LibrarianDashboard = () => {
   const [pendingBooks, setPendingBooks] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
+  const [editingBook, setEditingBook] = useState<any | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGrade, setFilterGrade] = useState('');
   const [filterClass, setFilterClass] = useState('');
@@ -128,6 +131,21 @@ export const LibrarianDashboard = () => {
       console.error('Error updating verification status:', error);
       alert('Failed to update verification status. Please try again.');
     }
+  };
+
+  const handleEditBook = (book: any) => {
+    setEditingBook(book);
+    setShowEditModal(true);
+  };
+
+  const handleEditModalClose = () => {
+    setShowEditModal(false);
+    setEditingBook(null);
+  };
+
+  const handleBookUpdated = async () => {
+    await fetchData();
+    handleEditModalClose();
   };
 
   if (loading) {
@@ -307,6 +325,7 @@ export const LibrarianDashboard = () => {
               <BookLogTable
                 books={filteredBooks}
                 onCommentClick={setSelectedBook}
+                onBookEdit={handleEditBook}
                 showStudent={true}
               />
             </div>
@@ -387,6 +406,13 @@ export const LibrarianDashboard = () => {
                                 >
                                   View Details
                                 </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => handleEditBook(book)}
+                                >
+                                  Edit Book
+                                </Button>
                               </div>
                             </td>
                           </tr>
@@ -458,6 +484,13 @@ export const LibrarianDashboard = () => {
           onCommentAdded={fetchData}
         />
       )}
+
+      <AddBookModal
+        isOpen={showEditModal}
+        onClose={handleEditModalClose}
+        onSaved={handleBookUpdated}
+        book={editingBook}
+      />
     </div>
   );
 };

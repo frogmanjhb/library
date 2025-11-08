@@ -141,16 +141,20 @@ async function main() {
           verifiedAt: isPending ? null : new Date(),
           verifiedById: isPending ? null : librarian.id,
           pointsAwarded: !isPending,
+          pointsAwardedValue: !isPending ? Math.floor(bookData.words / 1000) : 0,
           createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000), // Random date within last 30 days
         },
       });
 
-      // Add points (10 per approved book)
+      // Add points (1 point per 1,000 words)
       if (!isPending) {
-        await prisma.point.update({
-          where: { userId: student.id },
-          data: { totalPoints: { increment: 10 } },
-        });
+        const awardedPoints = Math.floor(bookData.words / 1000);
+        if (awardedPoints > 0) {
+          await prisma.point.update({
+            where: { userId: student.id },
+            data: { totalPoints: { increment: awardedPoints } },
+          });
+        }
       }
 
       totalBooks++;

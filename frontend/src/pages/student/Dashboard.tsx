@@ -338,7 +338,7 @@ export const StudentDashboard = () => {
                 {pendingCount > 0 && (
                   <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                     You have {pendingCount} book{pendingCount > 1 ? 's' : ''} awaiting librarian verification.
-                    You will earn points once they are approved.
+                    You will earn points (1 point per 1,000 words) once they are approved.
                   </div>
                 )}
                 {rejectedCount > 0 && (
@@ -355,7 +355,7 @@ export const StudentDashboard = () => {
                 <BookOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-xl font-semibold mb-2">No books yet!</h3>
                 <p className="text-muted-foreground mb-4">
-                  Start logging the books you've read to earn points once they are approved by the librarian.
+                  Start logging the books you've read to earn points (1 point per 1,000 words) once they are approved by the librarian.
                 </p>
                 <Button
                   onClick={handleAddBook}

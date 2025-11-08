@@ -26,12 +26,14 @@ interface Book {
 interface BookLogTableProps {
   books: Book[];
   onCommentClick?: (bookId: string) => void;
+  onBookEdit?: (book: Book) => void;
   showStudent?: boolean;
 }
 
 export const BookLogTable: React.FC<BookLogTableProps> = ({ 
   books, 
   onCommentClick,
+  onBookEdit,
   showStudent = true 
 }) => {
   const STATUS_STYLES: Record<Book['status'], { label: string; className: string }> = {
@@ -68,6 +70,8 @@ export const BookLogTable: React.FC<BookLogTableProps> = ({
     );
   }
 
+  const showActions = Boolean(onBookEdit) || Boolean(onCommentClick);
+
   return (
     <Card>
       <div className="overflow-x-auto">
@@ -82,7 +86,7 @@ export const BookLogTable: React.FC<BookLogTableProps> = ({
               <th className="text-left p-4 font-semibold">Lexile</th>
               <th className="text-left p-4 font-semibold">Words</th>
               <th className="text-left p-4 font-semibold">Date</th>
-              {onCommentClick && <th className="text-left p-4 font-semibold">Actions</th>}
+              {showActions && <th className="text-left p-4 font-semibold">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -139,16 +143,29 @@ export const BookLogTable: React.FC<BookLogTableProps> = ({
                 <td className="p-4 text-sm">
                   {new Date(book.createdAt).toLocaleDateString()}
                 </td>
-                {onCommentClick && (
+                {showActions && (
                   <td className="p-4">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onCommentClick(book.id)}
-                    >
-                      <MessageSquare className="w-4 h-4 mr-1" />
-                      {book.comments?.length || 0}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      {onBookEdit && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => onBookEdit(book)}
+                        >
+                          Edit
+                        </Button>
+                      )}
+                      {onCommentClick && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onCommentClick(book.id)}
+                        >
+                          <MessageSquare className="w-4 h-4 mr-1" />
+                          {book.comments?.length || 0}
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 )}
               </tr>

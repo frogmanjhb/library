@@ -6,7 +6,7 @@ A comprehensive web application for tracking student reading progress, built for
 
 ### For Students
 - 📖 Log books with ratings, comments, and metadata
-- 🏆 Earn points for each book logged (10 points per book)
+- 🏆 Earn points based on words read (1 point for every 1,000 words)
 - 📊 View personalized reading statistics
 - 🥇 Compete on multiple leaderboards (Grade, School, Words Read, Lexile Level)
 - 📱 Beautiful, responsive interface with animations
@@ -191,7 +191,7 @@ See [prisma/schema.prisma](./prisma/schema.prisma) for the complete schema.
 - Google OAuth 2.0 with domain restriction to `@stpeters.co.za`
 - JWT tokens for session management
 - Role-based access control (STUDENT, TEACHER, LIBRARIAN)
-- Automatic point system (+10 points per book logged)
+- Automatic point system (1 point per 1,000 words once a book is approved)
 
 ## 🎨 Design System
 

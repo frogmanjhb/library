@@ -61,6 +61,7 @@ model Book {
   verifiedAt  DateTime?
   verifiedById String?
   pointsAwarded Boolean @default(false)
+  pointsAwardedValue Int @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
