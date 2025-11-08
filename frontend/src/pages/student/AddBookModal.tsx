@@ -150,10 +150,6 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
         />
       </div>
 
-      <div className="rounded-md border border-primary/10 bg-primary/5 px-4 py-3 text-sm text-primary/80">
-        We&apos;ll look up details like Lexile, word count, genres, and cover art automatically
-        after you submit. No need to fill those in manually.
-      </div>
 
       <div className="flex gap-2 pt-4">
         <Button type="submit" disabled={loading} className="flex-1">
