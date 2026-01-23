@@ -1,4 +1,4 @@
-import { Star, Edit, Trash2 } from 'lucide-react';
+import { Star, Edit, Trash2, Award } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -23,18 +23,40 @@ interface BookCardProps {
       name: string;
       email: string;
     } | null;
+    pointsAwardedValue?: number;
   };
   onEdit?: (book: any) => void;
   onDelete?: (bookId: string) => void;
   showActions?: boolean;
+  studentLexile?: number | null;
 }
 
 export const BookCard: React.FC<BookCardProps> = ({ 
   book, 
   onEdit, 
   onDelete, 
-  showActions = false 
+  showActions = false,
+  studentLexile
 }) => {
+  // Calculate points display based on lexile comparison
+  const getPointsInfo = () => {
+    if (book.status === 'APPROVED' && book.pointsAwardedValue !== undefined) {
+      return { points: book.pointsAwardedValue, label: 'earned' };
+    }
+    
+    if (!book.lexileLevel || !studentLexile) {
+      return null;
+    }
+    
+    let points = 1;
+    if (book.lexileLevel > studentLexile) points = 3;
+    else if (book.lexileLevel >= studentLexile - 50) points = 2;
+    
+    return { points, label: 'potential' };
+  };
+
+  const pointsInfo = getPointsInfo();
+
   const STATUS_STYLES: Record<BookCardProps['book']['status'], { label: string; className: string }> = {
     PENDING: {
       label: 'Pending Verification',
@@ -107,6 +129,19 @@ export const BookCard: React.FC<BookCardProps> = ({
             )}
             {book.wordCount && (
               <Badge variant="outline">{book.wordCount.toLocaleString()} words</Badge>
+            )}
+            {pointsInfo && (
+              <Badge 
+                className={`${
+                  pointsInfo.label === 'earned' 
+                    ? 'bg-emerald-100 text-emerald-800 border-emerald-200' 
+                    : 'bg-blue-100 text-blue-800 border-blue-200'
+                }`}
+              >
+                <Award className="w-3 h-3 mr-1" />
+                {pointsInfo.points} pt{pointsInfo.points !== 1 ? 's' : ''} 
+                {pointsInfo.label === 'potential' && ' (est.)'}
+              </Badge>
             )}
           </div>
 

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, Star } from 'lucide-react';
+import { X, Star, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AddBookModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface AddBookModalProps {
   onSaved: () => void;
   book: any | null;
   inline?: boolean;
+  studentLexile?: number | null;
 }
 
 export const AddBookModal: React.FC<AddBookModalProps> = ({ 
@@ -19,8 +21,10 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
   onClose, 
   onSaved, 
   book,
-  inline = false 
+  inline = false,
+  studentLexile: propStudentLexile
 }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     author: '',
@@ -33,6 +37,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
     coverUrl: '',
   });
   const [loading, setLoading] = useState(false);
+  const [studentLexile, setStudentLexile] = useState<number | null>(propStudentLexile ?? null);
 
   useEffect(() => {
     if (book) {
@@ -49,6 +54,27 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
       });
     }
   }, [book]);
+
+  useEffect(() => {
+    // Fetch student's current lexile if not provided as prop
+    if (user && propStudentLexile === undefined) {
+      api.get(`/api/lexile/student/${user.id}`)
+        .then(res => setStudentLexile(res.data.currentLexile))
+        .catch(() => setStudentLexile(null));
+    }
+  }, [user, propStudentLexile]);
+
+  // Calculate expected points based on book lexile vs student lexile
+  const getExpectedPoints = () => {
+    const bookLexile = parseInt(formData.lexileLevel);
+    if (!bookLexile || !studentLexile) return null;
+    
+    if (bookLexile > studentLexile) return 3;
+    if (bookLexile >= studentLexile - 50) return 2;
+    return 1;
+  };
+
+  const expectedPoints = getExpectedPoints();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,6 +133,25 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
           Your log will show as pending until a librarian reviews it. Points are added after approval.
         </div>
       )}
+      
+      {/* Lexile-based points guidance */}
+      {studentLexile && !book && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <div className="flex items-start gap-2">
+            <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-medium">Your Lexile Level: {studentLexile}L</p>
+              <p className="mt-1">Points are based on the book's lexile compared to yours:</p>
+              <ul className="mt-1 ml-4 list-disc">
+                <li><span className="font-medium text-emerald-700">3 points</span> — Book above your level (challenging read)</li>
+                <li><span className="font-medium text-blue-700">2 points</span> — Book at your level (just right)</li>
+                <li><span className="font-medium text-amber-700">1 point</span> — Book below your level</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div>
         <label className="block text-sm font-medium mb-1">
           Book Title <span className="text-red-500">*</span>
@@ -141,7 +186,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1">
-            Lexile Level
+            Book Lexile Level
           </label>
           <Input
             type="number"
@@ -149,6 +194,16 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
             onChange={(e) => setFormData({ ...formData, lexileLevel: e.target.value })}
             placeholder="Enter Lexile Level"
           />
+          {expectedPoints !== null && (
+            <p className={`text-xs mt-1 font-medium ${
+              expectedPoints === 3 ? 'text-emerald-600' : 
+              expectedPoints === 2 ? 'text-blue-600' : 'text-amber-600'
+            }`}>
+              Expected: {expectedPoints} point{expectedPoints !== 1 ? 's' : ''} 
+              {expectedPoints === 3 ? ' (above your level!)' : 
+               expectedPoints === 2 ? ' (at your level)' : ' (below your level)'}
+            </p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">

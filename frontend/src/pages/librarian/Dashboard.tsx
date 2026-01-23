@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, LogOut, Megaphone, Settings } from 'lucide-react';
+import { BookOpen, LogOut, Megaphone, Settings, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,9 +10,11 @@ import { AnnouncementBanner } from '@/components/AnnouncementBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { CommentModal } from '../teacher/CommentModal';
+import { useNavigate } from 'react-router-dom';
 
 export const LibrarianDashboard = () => {
   const { logout } = useAuth();
+  const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [pendingBooks, setPendingBooks] = useState([]);
@@ -174,6 +176,10 @@ export const LibrarianDashboard = () => {
               </h1>
               <p className="text-blue-100 mt-1">School-wide Management</p>
             </div>
+            <Button variant="secondary" onClick={() => navigate('/librarian/lexile')}>
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Lexile Levels
+            </Button>
             <Button variant="secondary" onClick={logout}>
               <LogOut className="w-4 h-4 mr-2" />
               Logout

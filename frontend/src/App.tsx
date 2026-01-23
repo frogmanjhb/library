@@ -7,6 +7,7 @@ import { Home } from './pages/Home';
 import { StudentDashboard } from './pages/student/Dashboard';
 import { TeacherDashboard } from './pages/teacher/Dashboard';
 import { LibrarianDashboard } from './pages/librarian/Dashboard';
+import { LexileManagement } from './pages/librarian/LexileManagement';
 
 function App() {
   return (
@@ -40,6 +41,24 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['LIBRARIAN']}>
                 <LibrarianDashboard />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/librarian"
+            element={
+              <ProtectedRoute allowedRoles={['LIBRARIAN']}>
+                <LibrarianDashboard />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/librarian/lexile"
+            element={
+              <ProtectedRoute allowedRoles={['LIBRARIAN']}>
+                <LexileManagement />
               </ProtectedRoute>
             }
           />

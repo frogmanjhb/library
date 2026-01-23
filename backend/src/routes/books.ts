@@ -4,6 +4,7 @@ import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { prisma } from '../lib/prisma';
 import { searchBookInfo } from '../services/bookSearch';
+import { getStudentCurrentLexile } from './lexile';
 
 const router = express.Router();
 
@@ -288,10 +289,31 @@ router.patch('/:id/verification', requireAuth, requireLibrarian, asyncHandler(as
     verifiedById: user.id,
   };
 
-  const calculatePoints = (wordCount?: number | null) =>
-    wordCount && wordCount > 0 ? Math.floor(wordCount / 1000) : 0;
+  // New lexile-based points calculation
+  // 3 points: book above student lexile
+  // 2 points: book at student level (within 50L)
+  // 1 point: book below student lexile or no lexile data
+  const calculateLexilePoints = async (bookLexile: number | null, userId: string): Promise<number> => {
+    if (!bookLexile) {
+      return 1; // Default if book has no lexile
+    }
+    
+    const studentLexile = await getStudentCurrentLexile(userId);
+    
+    if (!studentLexile) {
+      return 1; // Default if student has no lexile recorded
+    }
+    
+    if (bookLexile > studentLexile) {
+      return 3; // Above level
+    } else if (bookLexile >= studentLexile - 50) {
+      return 2; // At level (within 50L below)
+    } else {
+      return 1; // Below level
+    }
+  };
 
-  const currentPoints = calculatePoints(existingBook.wordCount);
+  const currentPoints = await calculateLexilePoints(existingBook.lexileLevel, existingBook.userId);
   const previouslyAwarded = existingBook.pointsAwardedValue ?? 0;
 
   if (targetStatus === BookStatus.APPROVED) {
@@ -392,22 +414,13 @@ router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
   await prisma.book.delete({ where: { id } });
 
   // Deduct points if they were previously awarded
-  if (book.pointsAwarded) {
-    const calculatePoints = (wordCount?: number | null) =>
-      wordCount && wordCount > 0 ? Math.floor(wordCount / 1000) : 0;
-    const pointsToDeduct =
-      book.pointsAwardedValue && book.pointsAwardedValue > 0
-        ? book.pointsAwardedValue
-        : calculatePoints(book.wordCount);
-
-    if (pointsToDeduct !== 0) {
-      await prisma.point.updateMany({
-        where: { userId: book.userId },
-        data: {
-          totalPoints: { decrement: pointsToDeduct },
-        },
-      });
-    }
+  if (book.pointsAwarded && book.pointsAwardedValue && book.pointsAwardedValue > 0) {
+    await prisma.point.updateMany({
+      where: { userId: book.userId },
+      data: {
+        totalPoints: { decrement: book.pointsAwardedValue },
+      },
+    });
   }
 
   res.json({ message: 'Book deleted successfully' });
@@ -416,6 +429,7 @@ router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
 /**
  * Background function to search for book information and update the book record
  * Runs asynchronously after book is created
+ * Note: Points are now lexile-based and calculated at verification time, not from word count
  */
 async function searchAndUpdateBook(bookId: string, title: string, author: string): Promise<void> {
   try {
@@ -428,30 +442,15 @@ async function searchAndUpdateBook(bookId: string, title: string, author: string
       select: {
         wordCount: true,
         genres: true,
-        pointsAwarded: true,
-        pointsAwardedValue: true,
-        status: true,
-        userId: true,
       },
     });
 
     // Only update if we found new information
     const updateData: any = {};
-    const calculatePoints = (wordCount?: number | null) =>
-      wordCount && wordCount > 0 ? Math.floor(wordCount / 1000) : 0;
-    let pointsDiff = 0;
 
     // Only update wordCount if we don't already have one or if search found one
     if (searchResults.wordCount !== null && !currentBook?.wordCount) {
       updateData.wordCount = searchResults.wordCount;
-      if (currentBook?.pointsAwarded) {
-        const newPoints = calculatePoints(searchResults.wordCount);
-        const previousPoints = currentBook.pointsAwardedValue ?? 0;
-        if (newPoints !== previousPoints) {
-          updateData.pointsAwardedValue = newPoints;
-          pointsDiff = newPoints - previousPoints;
-        }
-      }
     }
     
     // Merge genres: combine existing genres with search results, removing duplicates
@@ -470,27 +469,6 @@ async function searchAndUpdateBook(bookId: string, title: string, author: string
         where: { id: bookId },
         data: updateData,
       });
-      if (pointsDiff !== 0 && currentBook?.userId) {
-        if (pointsDiff > 0) {
-          await prisma.point.upsert({
-            where: { userId: currentBook.userId },
-            update: {
-              totalPoints: { increment: pointsDiff },
-            },
-            create: {
-              userId: currentBook.userId,
-              totalPoints: pointsDiff,
-            },
-          });
-        } else {
-          await prisma.point.update({
-            where: { userId: currentBook.userId },
-            data: {
-              totalPoints: { increment: pointsDiff },
-            },
-          });
-        }
-      }
       console.log(`Updated book ${bookId} with search results:`, updateData);
     } else {
       console.log(`No additional information found for book ${bookId}`);

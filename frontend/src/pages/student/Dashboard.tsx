@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, Plus, LogOut } from 'lucide-react';
+import { BookOpen, Plus, LogOut, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,13 @@ import { AddBookModal } from './AddBookModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { motion } from 'framer-motion';
+
+interface LexileRecord {
+  id: string;
+  term: number;
+  year: number;
+  lexile: number;
+}
 
 interface Book {
   id: string;
@@ -41,6 +48,12 @@ export const StudentDashboard = () => {
   const [showAddBook, setShowAddBook] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Lexile tracking state
+  const [currentLexile, setCurrentLexile] = useState<number | null>(null);
+  const [lexileRecords, setLexileRecords] = useState<LexileRecord[]>([]);
+  const [currentTerm, setCurrentTerm] = useState<number>(1);
+  const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
 
   useEffect(() => {
     fetchData();
@@ -48,23 +61,49 @@ export const StudentDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [booksRes, announcementsRes, pointsRes, statsRes] = await Promise.all([
+      const [booksRes, announcementsRes, pointsRes, statsRes, lexileRes] = await Promise.all([
         api.get('/api/books'),
         api.get('/api/announcements'),
         api.get(`/api/points/${user?.id}`),
         api.get(`/api/users/${user?.id}/stats`),
+        api.get(`/api/lexile/student/${user?.id}`).catch(() => ({ data: { records: [], currentLexile: null, currentTerm: 1, currentYear: new Date().getFullYear() } })),
       ]);
 
       setBooks(booksRes.data);
       setAnnouncements(announcementsRes.data);
       setPoints(pointsRes.data.totalPoints);
       setStats(statsRes.data);
+      
+      // Set lexile data
+      setLexileRecords(lexileRes.data.records || []);
+      setCurrentLexile(lexileRes.data.currentLexile);
+      setCurrentTerm(lexileRes.data.currentTerm || 1);
+      setCurrentYear(lexileRes.data.currentYear || new Date().getFullYear());
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Get lexile trend compared to previous term
+  const getLexileTrend = () => {
+    if (lexileRecords.length < 2) return null;
+    
+    const currentYearRecords = lexileRecords.filter(r => r.year === currentYear);
+    if (currentYearRecords.length < 2) return null;
+    
+    // Sort by term descending
+    const sorted = [...currentYearRecords].sort((a, b) => b.term - a.term);
+    if (sorted.length < 2) return null;
+    
+    const latest = sorted[0].lexile;
+    const previous = sorted[1].lexile;
+    
+    return latest - previous;
+  };
+
+  const lexileTrend = getLexileTrend();
 
   const handleAddBook = () => {
     setEditingBook(null);
@@ -170,7 +209,7 @@ export const StudentDashboard = () => {
         <AnnouncementBanner announcements={announcements} />
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -215,11 +254,51 @@ export const StudentDashboard = () => {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Avg Lexile Level
+                  Your Lexile Level
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-green-600">
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl font-bold text-green-600">
+                    {currentLexile ? `${currentLexile}L` : '-'}
+                  </span>
+                  {lexileTrend !== null && (
+                    <span className={`flex items-center text-sm font-medium ${
+                      lexileTrend > 0 ? 'text-emerald-600' : 
+                      lexileTrend < 0 ? 'text-rose-600' : 'text-gray-500'
+                    }`}>
+                      {lexileTrend > 0 ? (
+                        <><TrendingUp className="w-4 h-4 mr-1" />+{lexileTrend}</>
+                      ) : lexileTrend < 0 ? (
+                        <><TrendingDown className="w-4 h-4 mr-1" />{lexileTrend}</>
+                      ) : (
+                        <><Minus className="w-4 h-4 mr-1" />0</>
+                      )}
+                    </span>
+                  )}
+                </div>
+                {currentLexile && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Term {currentTerm}, {currentYear}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Avg Book Lexile
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-blue-600">
                   {stats.avgLexile}L
                 </div>
               </CardContent>
@@ -338,7 +417,7 @@ export const StudentDashboard = () => {
                 {pendingCount > 0 && (
                   <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                     You have {pendingCount} book{pendingCount > 1 ? 's' : ''} awaiting librarian verification.
-                    You will earn points (1 point per 1,000 words) once they are approved.
+                    You will earn points based on book difficulty (1-3 points) once approved.
                   </div>
                 )}
                 {rejectedCount > 0 && (
@@ -355,7 +434,7 @@ export const StudentDashboard = () => {
                 <BookOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-xl font-semibold mb-2">No books yet!</h3>
                 <p className="text-muted-foreground mb-4">
-                  Start logging the books you've read to earn points (1 point per 1,000 words) once they are approved by the librarian.
+                  Start logging the books you've read to earn points! Books above your lexile level earn 3 points, at your level earn 2 points, and below earn 1 point.
                 </p>
                 <Button
                   onClick={handleAddBook}
@@ -375,6 +454,7 @@ export const StudentDashboard = () => {
                     onEdit={handleEditBook}
                     onDelete={handleDeleteBook}
                     showActions={true}
+                    studentLexile={currentLexile}
                   />
                 ))}
               </div>
@@ -393,6 +473,7 @@ export const StudentDashboard = () => {
                   onSaved={handleBookSaved}
                   book={null}
                   inline={true}
+                  studentLexile={currentLexile}
                 />
               </CardContent>
             </Card>
@@ -414,6 +495,7 @@ export const StudentDashboard = () => {
           }}
           onSaved={handleBookSaved}
           book={editingBook}
+          studentLexile={currentLexile}
         />
       )}
     </div>

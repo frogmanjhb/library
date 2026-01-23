@@ -15,6 +15,7 @@ import leaderboardRoutes from './routes/leaderboard';
 import commentRoutes from './routes/comments';
 import announcementRoutes from './routes/announcements';
 import pointRoutes from './routes/points';
+import lexileRoutes from './routes/lexile';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -51,6 +52,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/points', pointRoutes);
+app.use('/api/lexile', lexileRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

@@ -33,11 +33,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  books         Book[]
-  verifiedBooks Book[] @relation("BookVerifiers")
-  points        Point?
-  announcements Announcement[]
-  comments      Comment[]
+  books          Book[]
+  verifiedBooks  Book[] @relation("BookVerifiers")
+  points         Point?
+  announcements  Announcement[]
+  comments       Comment[]
+  studentLexiles StudentLexile[]
 
   @@index([email])
   @@index([role])
@@ -114,5 +115,20 @@ model Comment {
 
   @@index([bookId])
   @@index([teacherId])
+}
+
+model StudentLexile {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  term      Int      // 1, 2, or 3
+  year      Int      // Academic year (e.g., 2026)
+  lexile    Int      // Lexile level (e.g., 650)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, term, year])
+  @@index([userId])
+  @@index([year, term])
 }
 
