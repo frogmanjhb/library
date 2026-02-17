@@ -9,6 +9,7 @@
     "migrate": "prisma migrate dev --schema=./prisma/schema.prisma",
     "migrate:deploy": "prisma migrate deploy --schema=./prisma/schema.prisma",
     "seed": "tsx ../scripts/seed.ts",
+    "clear-books": "tsx ../scripts/clear-books.ts",
     "prisma:generate": "prisma generate --schema=./prisma/schema.prisma"
   },
   "dependencies": {
