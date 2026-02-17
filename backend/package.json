@@ -10,7 +10,8 @@
     "migrate:deploy": "prisma migrate deploy --schema=./prisma/schema.prisma",
     "seed": "tsx ../scripts/seed.ts",
     "clear-books": "tsx ./scripts/clear-books.ts",
-    "prisma:generate": "prisma generate --schema=./prisma/schema.prisma"
+    "prisma:generate": "prisma generate --schema=./prisma/schema.prisma",
+    "postinstall": "prisma generate --schema=./prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.8.0",

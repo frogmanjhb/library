@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, LogOut, Megaphone, Settings, BarChart3, Library } from 'lucide-react';
+import { BookOpen, LogOut, Megaphone, Settings, BarChart3, Library, Cog } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -181,6 +181,7 @@ export const LibrarianDashboard = () => {
             <Button variant="secondary" onClick={() => setShowLibraryManagement(true)}>
               <Library className="w-4 h-4 mr-2" />
               Library Management
+              <Cog className="w-3 h-3 ml-1.5 opacity-80" aria-hidden />
             </Button>
             <Button variant="secondary" onClick={() => navigate('/librarian/lexile')}>
               <BarChart3 className="w-4 h-4 mr-2" />

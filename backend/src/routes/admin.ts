@@ -185,24 +185,7 @@ router.patch('/students/bulk', asyncHandler(async (req, res) => {
   res.json({ updated: count });
 }));
 
-// Delete single student
-router.delete('/students/:id', asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  const student = await prisma.user.findUnique({
-    where: { id },
-  });
-
-  if (!student || student.role !== 'STUDENT') {
-    throw new AppError('Student not found', 404);
-  }
-
-  await prisma.user.delete({ where: { id } });
-
-  res.json({ message: 'Student deleted successfully' });
-}));
-
-// Bulk delete students
+// Bulk delete students (must be before /:id to avoid "bulk" being matched as id)
 router.delete('/students/bulk', asyncHandler(async (req, res) => {
   const { ids } = req.body;
 
@@ -218,6 +201,23 @@ router.delete('/students/bulk', asyncHandler(async (req, res) => {
   });
 
   res.json({ deleted: count });
+}));
+
+// Delete single student
+router.delete('/students/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const student = await prisma.user.findUnique({
+    where: { id },
+  });
+
+  if (!student || student.role !== 'STUDENT') {
+    throw new AppError('Student not found', 404);
+  }
+
+  await prisma.user.delete({ where: { id } });
+
+  res.json({ message: 'Student deleted successfully' });
 }));
 
 export default router;
