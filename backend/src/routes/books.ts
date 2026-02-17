@@ -152,15 +152,10 @@ router.get('/:id', requireAuth, asyncHandler(async (req, res) => {
   res.json(book);
 }));
 
-// Create a new book log
+// Create a new book log (students) or on behalf of student (librarians)
 router.post('/', requireAuth, asyncHandler(async (req, res) => {
   const user = req.user!;
-
-  if (user.role !== 'STUDENT') {
-    throw new AppError('Only students can log books', 403);
-  }
-
-  const { title, author, rating, comment, lexileLevel, wordCount, ageRange, genres, coverUrl } = req.body;
+  const { title, author, rating, comment, lexileLevel, wordCount, ageRange, genres, coverUrl, userId: targetUserId } = req.body;
 
   // Validate required fields
   if (!title || !author || !rating) {
@@ -169,6 +164,19 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
 
   if (rating < 1 || rating > 5) {
     throw new AppError('Rating must be between 1 and 5', 400);
+  }
+
+  let bookUserId: string;
+  if (user.role === 'LIBRARIAN' && targetUserId) {
+    const target = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!target || target.role !== 'STUDENT') {
+      throw new AppError('Invalid or non-student userId', 400);
+    }
+    bookUserId = targetUserId;
+  } else if (user.role === 'STUDENT') {
+    bookUserId = user.id;
+  } else {
+    throw new AppError('Only students can log books, or librarians must provide userId', 403);
   }
 
   // Create book immediately with user-provided data
@@ -183,14 +191,14 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
       ageRange,
       genres: genres || [],
       coverUrl,
-      userId: user.id,
+      userId: bookUserId,
       status: BookStatus.PENDING,
     },
   });
 
   // Emit socket event for real-time updates
   const io = req.app.get('io');
-  io.emit('book:logged', { bookId: book.id, userId: user.id });
+  io.emit('book:logged', { bookId: book.id, userId: bookUserId });
   io.emit('leaderboard:update');
 
   // Trigger asynchronous background search for word count and genre
@@ -200,6 +208,75 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
   });
 
   res.status(201).json(book);
+}));
+
+// Bulk delete books (librarian only)
+router.delete('/bulk', requireAuth, requireLibrarian, asyncHandler(async (req, res) => {
+  const { ids } = req.body;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new AppError('ids array is required and must not be empty', 400);
+  }
+
+  const books = await prisma.book.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, userId: true, pointsAwarded: true, pointsAwardedValue: true },
+  });
+
+  for (const book of books) {
+    await prisma.book.delete({ where: { id: book.id } });
+    if (book.pointsAwarded && book.pointsAwardedValue && book.pointsAwardedValue > 0) {
+      await prisma.point.updateMany({
+        where: { userId: book.userId },
+        data: { totalPoints: { decrement: book.pointsAwardedValue } },
+      });
+    }
+  }
+
+  const io = req.app.get('io');
+  io.emit('leaderboard:update');
+
+  res.json({ deleted: books.length });
+}));
+
+// Bulk update books (librarian only) - e.g. status, lexileLevel, wordCount
+router.patch('/bulk', requireAuth, requireLibrarian, asyncHandler(async (req, res) => {
+  const { ids, ...fields } = req.body;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new AppError('ids array is required and must not be empty', 400);
+  }
+
+  const allowedFields = ['status', 'lexileLevel', 'wordCount', 'ageRange', 'genres'];
+  const updateData: Record<string, unknown> = {};
+  for (const key of allowedFields) {
+    if (fields[key] !== undefined) {
+      if (key === 'lexileLevel' || key === 'wordCount') {
+        updateData[key] = fields[key] === null || fields[key] === '' ? null : parseInt(fields[key], 10);
+      } else if (key === 'status') {
+        const s = String(fields[key]).toUpperCase();
+        if (['PENDING', 'APPROVED', 'REJECTED'].includes(s)) {
+          updateData[key] = s;
+        }
+      } else {
+        updateData[key] = fields[key];
+      }
+    }
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new AppError('Provide at least one field to update (status, lexileLevel, wordCount, ageRange, genres)', 400);
+  }
+
+  const { count } = await prisma.book.updateMany({
+    where: { id: { in: ids } },
+    data: updateData,
+  });
+
+  const io = req.app.get('io');
+  io.emit('leaderboard:update');
+
+  res.json({ updated: count });
 }));
 
 // Update book

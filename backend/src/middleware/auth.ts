@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { PrismaClient, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import { AppError } from './errorHandler';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 interface JWTPayload {
   userId: string;

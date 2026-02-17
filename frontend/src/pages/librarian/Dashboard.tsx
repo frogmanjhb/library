@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, LogOut, Megaphone, Settings, BarChart3 } from 'lucide-react';
+import { BookOpen, LogOut, Megaphone, Settings, BarChart3, Library } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { AnnouncementBanner } from '@/components/AnnouncementBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { CommentModal } from '../teacher/CommentModal';
+import { LibraryManagementModal } from '@/components/LibraryManagementModal';
 import { useNavigate } from 'react-router-dom';
 
 export const LibrarianDashboard = () => {
@@ -26,6 +27,7 @@ export const LibrarianDashboard = () => {
   const [filterGrade, setFilterGrade] = useState('');
   const [filterClass, setFilterClass] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showLibraryManagement, setShowLibraryManagement] = useState(false);
 
   // Announcement management
   const [newAnnouncement, setNewAnnouncement] = useState('');
@@ -176,6 +178,10 @@ export const LibrarianDashboard = () => {
               </h1>
               <p className="text-white/90 mt-1 font-medium">School-wide Management</p>
             </div>
+            <Button variant="secondary" onClick={() => setShowLibraryManagement(true)}>
+              <Library className="w-4 h-4 mr-2" />
+              Library Management
+            </Button>
             <Button variant="secondary" onClick={() => navigate('/librarian/lexile')}>
               <BarChart3 className="w-4 h-4 mr-2" />
               Lexile Levels
@@ -496,6 +502,12 @@ export const LibrarianDashboard = () => {
         onClose={handleEditModalClose}
         onSaved={handleBookUpdated}
         book={editingBook}
+      />
+
+      <LibraryManagementModal
+        isOpen={showLibraryManagement}
+        onClose={() => setShowLibraryManagement(false)}
+        onDataChanged={fetchData}
       />
     </div>
   );

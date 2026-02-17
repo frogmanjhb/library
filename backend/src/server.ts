@@ -1,11 +1,12 @@
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
-// Load environment variables
-dotenv.config();
+// Load .env from backend root (works around npm workspace cwd)
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -16,6 +17,7 @@ import commentRoutes from './routes/comments';
 import announcementRoutes from './routes/announcements';
 import pointRoutes from './routes/points';
 import lexileRoutes from './routes/lexile';
+import adminRoutes from './routes/admin';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -53,6 +55,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/points', pointRoutes);
 app.use('/api/lexile', lexileRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
