@@ -72,9 +72,9 @@ export const TeacherDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50/50 to-rose-50">
       {/* Header */}
-      <header className="bg-primary text-white shadow-lg">
+      <header className="bg-primary text-white shadow-buttonHover">
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
             <div>
@@ -82,7 +82,7 @@ export const TeacherDashboard = () => {
                 <BookOpen className="w-8 h-8" />
                 Teacher Dashboard
               </h1>
-              <p className="text-blue-100 mt-1">
+              <p className="text-white/90 mt-1 font-medium">
                 {user?.name} • Grade {user?.grade}{user?.class}
               </p>
             </div>
@@ -166,7 +166,7 @@ export const TeacherDashboard = () => {
                   Filter by Rating
                 </label>
                 <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="w-full h-11 rounded-xl border-2 border-input bg-background px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary/30"
                   value={filterRating}
                   onChange={(e) => setFilterRating(e.target.value)}
                 >

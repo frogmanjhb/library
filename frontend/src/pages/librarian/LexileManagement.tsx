@@ -185,9 +185,9 @@ export const LexileManagement = () => {
   const years = [currentYear - 1, currentYear, currentYear + 1];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50/50 to-rose-50">
       {/* Header */}
-      <header className="bg-primary text-white shadow-lg">
+      <header className="bg-primary text-white shadow-buttonHover">
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
             <div>
@@ -195,7 +195,7 @@ export const LexileManagement = () => {
                 <BookOpen className="w-8 h-8" />
                 Lexile Level Management
               </h1>
-              <p className="text-blue-100 mt-1">Track and manage student lexile levels</p>
+              <p className="text-white/90 mt-1 font-medium">Track and manage student lexile levels</p>
             </div>
             <div className="flex items-center gap-4">
               <Button variant="secondary" onClick={() => navigate('/librarian')}>
@@ -223,7 +223,7 @@ export const LexileManagement = () => {
               <div>
                 <label className="block text-sm font-medium mb-1">Grade</label>
                 <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="w-full h-11 rounded-xl border-2 border-input bg-background px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary/30"
                   value={selectedGrade}
                   onChange={(e) => setSelectedGrade(e.target.value)}
                 >
@@ -238,7 +238,7 @@ export const LexileManagement = () => {
               <div>
                 <label className="block text-sm font-medium mb-1">Class</label>
                 <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="w-full h-11 rounded-xl border-2 border-input bg-background px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary/30"
                   value={selectedClass}
                   onChange={(e) => setSelectedClass(e.target.value)}
                 >
@@ -250,7 +250,7 @@ export const LexileManagement = () => {
               <div>
                 <label className="block text-sm font-medium mb-1">Academic Year</label>
                 <select
-                  className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  className="w-full h-11 rounded-xl border-2 border-input bg-background px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary/30"
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                 >
@@ -294,7 +294,7 @@ export const LexileManagement = () => {
                   <div>
                     <label className="block text-sm font-medium mb-1">Term</label>
                     <select
-                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      className="w-full h-11 rounded-xl border-2 border-input bg-background px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary/30"
                       value={selectedTerm}
                       onChange={(e) => setSelectedTerm(parseInt(e.target.value))}
                     >
@@ -316,7 +316,7 @@ export const LexileManagement = () => {
                   placeholder="John Smith, 650
 Jane Doe, 720
 Bob Wilson, 580"
-                  className="w-full min-h-[150px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono mb-4"
+                  className="w-full min-h-[150px] rounded-xl border-2 border-input bg-background px-4 py-3 text-sm font-mono font-medium mb-4 focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary/30"
                 />
                 
                 <div className="flex gap-2">

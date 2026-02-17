@@ -43,7 +43,7 @@ export const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announce
               animate={{ rotate: [0, -2.5, 2.5, -2.5, 0] }}
               transition={{ duration: 0.9, repeat: Infinity, repeatDelay: 4, ease: 'easeInOut' }}
             >
-              <Card className="bg-gradient-to-r from-secondary/20 to-secondary/10 border-secondary/30">
+              <Card className="bg-gradient-to-r from-secondary/30 via-amber-100/80 to-secondary/20 border-2 border-secondary/40 shadow-card">
                 <div className="p-4 flex items-start gap-3">
                   <Megaphone className="w-5 h-5 text-secondary mt-0.5 flex-shrink-0" />
                   <div className="flex-1">

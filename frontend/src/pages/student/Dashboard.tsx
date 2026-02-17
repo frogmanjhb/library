@@ -181,9 +181,9 @@ export const StudentDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50/50 to-rose-50">
       {/* Header */}
-      <header className="bg-primary text-white shadow-lg">
+      <header className="bg-primary text-white shadow-buttonHover">
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
             <div>
@@ -191,7 +191,7 @@ export const StudentDashboard = () => {
                 <BookOpen className="w-8 h-8" />
                 St Peter's Library
               </h1>
-              <p className="text-blue-100 mt-1">Welcome back, {user?.name}!</p>
+              <p className="text-white/90 mt-1 font-medium">Welcome back, {user?.name}!</p>
             </div>
             <div className="flex items-center gap-4">
               <PointsBadge points={points} size="lg" />
@@ -313,7 +313,7 @@ export const StudentDashboard = () => {
           transition={{ delay: 0.35 }}
           className="mb-10"
         >
-          <Card className="border-none shadow-xl bg-gradient-to-br from-white via-slate-50 to-blue-50">
+          <Card className="border-2 border-primary/10 shadow-cardHover bg-gradient-to-br from-white via-amber-50/30 to-orange-50/30">
             <CardHeader className="pb-2">
               <CardTitle className="text-2xl font-semibold text-primary">
                 Collectable Reading Badges
@@ -405,7 +405,7 @@ export const StudentDashboard = () => {
               <Button
                 onClick={handleAddBook}
                 size="lg"
-                className="gap-2 rounded-xl px-8 py-3 text-lg font-semibold shadow-lg shadow-primary/20 transition hover:scale-[1.02]"
+                className="gap-2"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Book
@@ -439,7 +439,7 @@ export const StudentDashboard = () => {
                 <Button
                   onClick={handleAddBook}
                   size="lg"
-                  className="gap-2 rounded-xl px-8 py-3 text-lg font-semibold shadow-lg shadow-primary/20 transition hover:scale-[1.02]"
+                  className="gap-2"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Log Your First Book

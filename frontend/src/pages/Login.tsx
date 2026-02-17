@@ -47,14 +47,14 @@ export const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-400 via-orange-300 to-amber-300 p-4">
+      <Card className="w-full max-w-md border-2 border-white/50 shadow-2xl">
+          <CardHeader className="text-center">
           <div className="mb-4">
-            <h1 className="text-3xl font-bold text-primary mb-2">
+            <h1 className="text-3xl font-extrabold text-primary mb-2">
               St Peter's Library
             </h1>
-            <p className="text-xl font-semibold text-gray-700">
+            <p className="text-xl font-bold text-foreground">
               Reading Tracker
             </p>
           </div>

@@ -22,7 +22,7 @@ export const PointsBadge: React.FC<PointsBadgeProps> = ({ points, size = 'md' })
     >
       <Badge 
         variant="secondary" 
-        className={`${sizeClasses[size]} font-bold flex items-center gap-1`}
+        className={`${sizeClasses[size]} font-extrabold flex items-center gap-1 shadow-sm border-2 border-secondary/30`}
       >
         <Trophy className={`${size === 'lg' ? 'w-5 h-5' : 'w-4 h-4'}`} />
         {points} points

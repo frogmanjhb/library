@@ -138,7 +138,7 @@ export const Leaderboard = () => {
   };
 
   return (
-    <Card>
+    <Card className="border-2 border-primary/10">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Medal className="w-6 h-6 text-secondary" />

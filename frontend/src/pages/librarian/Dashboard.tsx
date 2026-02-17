@@ -164,9 +164,9 @@ export const LibrarianDashboard = () => {
     : '0';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50/50 to-rose-50">
       {/* Header */}
-      <header className="bg-primary text-white shadow-lg">
+      <header className="bg-primary text-white shadow-buttonHover">
         <div className="container mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
             <div>
@@ -174,7 +174,7 @@ export const LibrarianDashboard = () => {
                 <BookOpen className="w-8 h-8" />
                 Librarian Dashboard
               </h1>
-              <p className="text-blue-100 mt-1">School-wide Management</p>
+              <p className="text-white/90 mt-1 font-medium">School-wide Management</p>
             </div>
             <Button variant="secondary" onClick={() => navigate('/librarian/lexile')}>
               <BarChart3 className="w-4 h-4 mr-2" />
@@ -295,7 +295,7 @@ export const LibrarianDashboard = () => {
                       Grade
                     </label>
                     <select
-                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      className="w-full h-11 rounded-xl border-2 border-input bg-background px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary/30"
                       value={filterGrade}
                       onChange={(e) => setFilterGrade(e.target.value)}
                     >
@@ -312,7 +312,7 @@ export const LibrarianDashboard = () => {
                       Class
                     </label>
                     <select
-                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      className="w-full h-11 rounded-xl border-2 border-input bg-background px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:border-primary/30"
                       value={filterClass}
                       onChange={(e) => setFilterClass(e.target.value)}
                     >
@@ -444,8 +444,8 @@ export const LibrarianDashboard = () => {
                   <textarea
                     value={newAnnouncement}
                     onChange={(e) => setNewAnnouncement(e.target.value)}
-                    placeholder="Write an announcement for all students..."
-                    className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring mb-4"
+                  placeholder="Write an announcement for all students..."
+                  className="w-full min-h-[100px] rounded-xl border-2 border-input bg-background px-4 py-3 text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-primary/30 mb-4"
                   />
                   <Button type="submit" disabled={submittingAnnouncement || !newAnnouncement.trim()}>
                     {submittingAnnouncement ? 'Publishing...' : 'Publish Announcement'}

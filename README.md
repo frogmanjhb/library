@@ -196,17 +196,18 @@ See [prisma/schema.prisma](./prisma/schema.prisma) for the complete schema.
 ## 🎨 Design System
 
 **Colors:**
-- Primary: Navy Blue (#1e3a8a)
-- Secondary: Gold (#f59e0b)
-- Background: White with subtle blue gradient
+- Primary: Coral (#FF6B6B) — bright, friendly, encourages reading
+- Secondary: Sunny Gold (#FBBF24)
+- Accent: Sky Blue (#38BDF8)
+- Background: Warm cream/peach gradient
 
 **Typography:**
-- Body: Inter
-- Headings: Poppins
+- Body & Headings: Nunito (round, friendly, modern)
 
 **Components:**
 - Built with shadcn/ui
-- Custom themed for St Peter's branding
+- Modern rounded cards (rounded-2xl), modals with backdrop blur
+- Bright, happy palette to encourage reading
 - Animated with Framer Motion
 
 ## 🔄 Realtime Features

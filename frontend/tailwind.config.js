@@ -24,12 +24,16 @@ export default {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: "#1e3a8a",
+          DEFAULT: "#FF6B6B",
           foreground: "#ffffff",
         },
         secondary: {
-          DEFAULT: "#f59e0b",
-          foreground: "#1e3a8a",
+          DEFAULT: "#FBBF24",
+          foreground: "#1c1917",
+        },
+        accent: {
+          DEFAULT: "#38BDF8",
+          foreground: "#1c1917",
         },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
@@ -39,23 +43,25 @@ export default {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
         },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
       },
       borderRadius: {
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 4px)",
+        sm: "calc(var(--radius) - 8px)",
+      },
+      boxShadow: {
+        card: "0 4px 20px -4px rgba(255, 107, 107, 0.15), 0 2px 8px -2px rgba(0, 0, 0, 0.08)",
+        cardHover: "0 12px 32px -8px rgba(255, 107, 107, 0.2), 0 4px 12px -4px rgba(0, 0, 0, 0.1)",
+        button: "0 2px 12px -2px rgba(255, 107, 107, 0.4)",
+        buttonHover: "0 4px 16px -4px rgba(255, 107, 107, 0.5)",
       },
       keyframes: {
         "accordion-down": {
@@ -66,13 +72,17 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "fade-in": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.3s ease-out",
       },
     },
   },
   plugins: [require("tailwindcss-animate")],
 }
-
