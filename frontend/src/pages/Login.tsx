@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ export const Login = () => {
   const navigate = useNavigate();
   const { user, login } = useAuth();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -32,7 +33,7 @@ export const Login = () => {
     setError('');
 
     try {
-      const response = await api.post('/auth/login', { email });
+      const response = await api.post('/auth/login', { email, password });
       await login(response.data.token);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
@@ -71,6 +72,15 @@ export const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="h-12"
+              />
+            </div>
+            <div>
+              <Input
+                type="password"
+                placeholder="Password (required if you signed up)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="h-12"
               />
             </div>
@@ -122,8 +132,11 @@ export const Login = () => {
             </div>
           </div>
 
-          <p className="text-xs text-center text-muted-foreground mt-4">
-            Only @stpeters.co.za email addresses are allowed
+          <p className="text-sm text-center text-muted-foreground mt-4">
+            Don&apos;t have an account?{' '}
+            <Link to="/signup" className="text-primary font-medium hover:underline">
+              Sign up
+            </Link>
           </p>
         </CardContent>
       </Card>

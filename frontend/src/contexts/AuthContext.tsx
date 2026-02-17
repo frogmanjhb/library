@@ -5,9 +5,11 @@ interface User {
   id: string;
   email: string;
   name: string;
+  surname?: string;
   role: 'STUDENT' | 'TEACHER' | 'LIBRARIAN';
   grade?: number;
   class?: string;
+  lexileLevel?: number;
 }
 
 interface AuthContextType {

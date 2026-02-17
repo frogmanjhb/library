@@ -1,47 +1,111 @@
 import express from 'express';
+import bcrypt from 'bcrypt';
 import { generateToken, requireAuth } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { prisma } from '../lib/prisma';
 
 const router = express.Router();
 
-// Simple dev login - just provide email
+// Student signup
+router.post('/signup', asyncHandler(async (req, res) => {
+  const { name, surname, class: studentClass, lexileLevel, email, password, confirmPassword } = req.body;
+
+  if (!name || !surname || !studentClass || !email || !password || !confirmPassword) {
+    throw new AppError('All fields are required', 400);
+  }
+
+  if (password !== confirmPassword) {
+    throw new AppError('Passwords do not match', 400);
+  }
+
+  if (password.length < 6) {
+    throw new AppError('Password must be at least 6 characters', 400);
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail.endsWith('@stpeters.co.za')) {
+    throw new AppError('Only @stpeters.co.za email addresses are allowed', 400);
+  }
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+  });
+
+  if (existingUser) {
+    throw new AppError('An account with this email already exists', 400);
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  const user = await prisma.user.create({
+    data: {
+      email: normalizedEmail,
+      name: name.trim(),
+      surname: surname.trim(),
+      class: studentClass.trim(),
+      lexileLevel: lexileLevel ? parseInt(lexileLevel, 10) : null,
+      passwordHash,
+      role: 'STUDENT',
+    },
+  });
+
+  await prisma.point.create({
+    data: {
+      userId: user.id,
+      totalPoints: 0,
+    },
+  });
+
+  const token = generateToken(user.id, user.email, user.role);
+
+  res.status(201).json({
+    token,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      surname: user.surname,
+      role: user.role,
+      grade: user.grade,
+      class: user.class,
+      lexileLevel: user.lexileLevel,
+    },
+  });
+}));
+
+// Login - supports both password auth (for signed-up students) and email-only (legacy)
 router.post('/login', asyncHandler(async (req, res) => {
-  const { email } = req.body;
+  const { email, password } = req.body;
 
   if (!email) {
     throw new AppError('Email is required', 400);
   }
 
-  // Find user by email
-  let user = await prisma.user.findUnique({
-    where: { email },
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
   });
 
-  // If user doesn't exist and it's a stpeters.co.za email, create them
-  if (!user && email.endsWith('@stpeters.co.za')) {
-    user = await prisma.user.create({
-      data: {
-        email,
-        name: email.split('@')[0],
-        role: 'STUDENT', // Default role
-      },
-    });
-
-    // Create initial points entry
-    await prisma.point.create({
-      data: {
-        userId: user.id,
-        totalPoints: 0,
-      },
-    });
-  }
-
   if (!user) {
-    throw new AppError('User not found. Please use a @stpeters.co.za email.', 404);
+    throw new AppError('User not found. Please sign up first or use a valid @stpeters.co.za email.', 404);
   }
 
-  // Generate JWT token
+  // If user has password, require it
+  if (user.passwordHash) {
+    if (!password) {
+      throw new AppError('Password is required', 400);
+    }
+    const validPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!validPassword) {
+      throw new AppError('Invalid email or password', 401);
+    }
+  } else {
+    // Legacy: email-only login for users without password (e.g. created by librarian)
+    if (!normalizedEmail.endsWith('@stpeters.co.za')) {
+      throw new AppError('Please use a @stpeters.co.za email.', 404);
+    }
+  }
+
   const token = generateToken(user.id, user.email, user.role);
 
   res.json({
@@ -50,9 +114,11 @@ router.post('/login', asyncHandler(async (req, res) => {
       id: user.id,
       email: user.email,
       name: user.name,
+      surname: user.surname,
       role: user.role,
       grade: user.grade,
       class: user.class,
+      lexileLevel: user.lexileLevel,
     },
   });
 }));
@@ -65,9 +131,11 @@ router.get('/me', requireAuth, asyncHandler(async (req, res) => {
     id: user!.id,
     email: user!.email,
     name: user!.name,
+    surname: user!.surname,
     role: user!.role,
     grade: user!.grade,
     class: user!.class,
+    lexileLevel: user!.lexileLevel,
   });
 }));
 

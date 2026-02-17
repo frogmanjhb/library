@@ -23,15 +23,18 @@ enum BookStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  role      Role     @default(STUDENT)
-  grade     Int?
-  class     String?
-  googleId  String?  @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String
+  surname      String?
+  passwordHash String?
+  role         Role     @default(STUDENT)
+  grade        Int?
+  class        String?
+  lexileLevel  Int?
+  googleId     String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   books          Book[]
   verifiedBooks  Book[] @relation("BookVerifiers")
