@@ -373,8 +373,8 @@ router.get('/class', requireAuth, asyncHandler(async (req, res) => {
     const term3 = student.studentLexiles.find(l => l.term === 3)?.lexile ?? null;
     
     // Calculate trends
-    let trend12 = null;
-    let trend23 = null;
+    let trend12: number | null = null;
+    let trend23: number | null = null;
     
     if (term1 !== null && term2 !== null) {
       trend12 = term2 - term1;
