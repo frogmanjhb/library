@@ -178,15 +178,6 @@ export const LibrarianDashboard = () => {
               </h1>
               <p className="text-white/90 mt-1 font-medium">School-wide Management</p>
             </div>
-            <Button variant="secondary" onClick={() => setShowLibraryManagement(true)}>
-              <Library className="w-4 h-4 mr-2" />
-              Library Management
-              <Cog className="w-3 h-3 ml-1.5 opacity-80" aria-hidden />
-            </Button>
-            <Button variant="secondary" onClick={() => navigate('/librarian/lexile')}>
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Lexile Levels
-            </Button>
             <Button variant="secondary" onClick={logout}>
               <LogOut className="w-4 h-4 mr-2" />
               Logout
@@ -263,18 +254,30 @@ export const LibrarianDashboard = () => {
 
         {/* Tabs */}
         <Tabs defaultValue="books" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="books">All Books</TabsTrigger>
-            <TabsTrigger value="verification">
-              Verification Queue
-              {pendingBooks.length > 0 && (
-                <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1 text-[11px] font-semibold text-white">
-                  {pendingBooks.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="announcements">Announcements</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center gap-2">
+            <TabsList className="flex flex-1 flex-wrap">
+              <TabsTrigger value="books">All Books</TabsTrigger>
+              <TabsTrigger value="verification">
+                Verification Queue
+                {pendingBooks.length > 0 && (
+                  <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1 text-[11px] font-semibold text-white">
+                    {pendingBooks.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="announcements">Announcements</TabsTrigger>
+              <TabsTrigger value="lexile">
+                <BarChart3 className="w-4 h-4 mr-1.5" />
+                Lexile Levels
+              </TabsTrigger>
+              <div className="flex-1" />
+              <TabsTrigger value="management">
+                <Library className="w-4 h-4 mr-1.5" />
+                Library Management
+                <Cog className="w-3 h-3 ml-1 opacity-80" aria-hidden />
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="books">
             {/* Filters */}
@@ -485,6 +488,48 @@ export const LibrarianDashboard = () => {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="lexile">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5" />
+                  Lexile Level Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">
+                  Manage student Lexile levels, track progress across terms, and view trends.
+                </p>
+                <Button onClick={() => navigate('/librarian/lexile')}>
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Open Lexile Management
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="management">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Library className="w-5 h-5" />
+                  <Cog className="w-4 h-4 opacity-80" />
+                  Library Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground mb-4">
+                  Manage student data and book records. Add, edit, or delete students and books individually or in bulk.
+                </p>
+                <Button onClick={() => setShowLibraryManagement(true)}>
+                  <Library className="w-4 h-4 mr-2" />
+                  Open Library Management
+                  <Cog className="w-3 h-3 ml-1.5 opacity-80" aria-hidden />
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
