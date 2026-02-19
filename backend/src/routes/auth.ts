@@ -9,10 +9,16 @@ const router = express.Router();
 
 // Student signup
 router.post('/signup', asyncHandler(async (req, res) => {
-  const { name, surname, class: studentClass, lexileLevel, email, password, confirmPassword } = req.body;
+  const { name, surname, grade, class: studentClass, lexileLevel, email, password, confirmPassword } = req.body;
 
-  if (!name || !surname || !studentClass || !email || !password || !confirmPassword) {
+  if (!name || !surname || !grade || !studentClass || !email || !password || !confirmPassword) {
     throw new AppError('All fields are required', 400);
+  }
+
+  // Validate grade
+  const gradeNum = parseInt(grade, 10);
+  if (isNaN(gradeNum) || gradeNum < 3 || gradeNum > 7) {
+    throw new AppError('Grade must be between 3 and 7', 400);
   }
 
   if (password !== confirmPassword) {
@@ -40,10 +46,11 @@ router.post('/signup', asyncHandler(async (req, res) => {
     email: normalizedEmail,
     name: name.trim(),
     surname: surname.trim(),
+    grade: gradeNum,
     class: studentClass.trim(),
     lexileLevel: lexileLevel ? parseInt(lexileLevel, 10) : null,
     passwordHash,
-      role: Role.STUDENT,
+    role: Role.STUDENT,
   });
 
   await createPoint({

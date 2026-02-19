@@ -57,6 +57,17 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
   const [bulkEditClass, setBulkEditClass] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [studentsForBook, setStudentsForBook] = useState<Student[]>([]);
+  const [addStudentGrade, setAddStudentGrade] = useState('');
+  const [addStudentClass, setAddStudentClass] = useState('');
+
+  // Class codes by grade
+  const CLASSES_BY_GRADE: Record<string, string[]> = {
+    '3': ['3SC', '3SCA', '3TB'],
+    '4': ['4KM', '4DA', '4KW'],
+    '5': ['5EF', '5JS', '5AM'],
+    '6': ['6A', '6B', '6C'],
+    '7': ['7A', '7B', '7C'],
+  };
 
   const fetchStudents = async () => {
     try {
@@ -86,6 +97,26 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
     }
   }, [isOpen, filterGrade, filterClass]);
 
+  // Reset class filter when grade filter changes
+  useEffect(() => {
+    if (filterGrade && filterClass) {
+      const classesForGrade = CLASSES_BY_GRADE[filterGrade] || [];
+      if (!classesForGrade.includes(filterClass)) {
+        setFilterClass('');
+      }
+    }
+  }, [filterGrade, filterClass]);
+
+  // Reset bulk edit class when grade changes
+  useEffect(() => {
+    if (bulkEditGrade && bulkEditClass) {
+      const classesForGrade = CLASSES_BY_GRADE[bulkEditGrade] || [];
+      if (!classesForGrade.includes(bulkEditClass)) {
+        setBulkEditClass('');
+      }
+    }
+  }, [bulkEditGrade, bulkEditClass]);
+
   useEffect(() => {
     if (showAddBook && isOpen) {
       api.get('/api/admin/students').then((res) => setStudentsForBook(res.data)).catch(() => {});
@@ -104,6 +135,8 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
     setBulkStudentInput('');
     setBulkEditGrade('');
     setBulkEditClass('');
+    setAddStudentGrade('');
+    setAddStudentClass('');
     onDataChanged?.();
     onClose();
   };
@@ -147,8 +180,8 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
     const form = e.currentTarget;
     const name = (form.elements.namedItem('studentName') as HTMLInputElement).value.trim();
     const email = (form.elements.namedItem('studentEmail') as HTMLInputElement).value.trim().toLowerCase();
-    const grade = (form.elements.namedItem('studentGrade') as HTMLInputElement).value;
-    const className = (form.elements.namedItem('studentClass') as HTMLInputElement).value;
+    const grade = addStudentGrade || (form.elements.namedItem('studentGrade') as HTMLSelectElement)?.value;
+    const className = addStudentClass || (form.elements.namedItem('studentClass') as HTMLSelectElement)?.value;
 
     if (!name || !email) return;
 
@@ -162,6 +195,8 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
       });
       await fetchStudents();
       setShowAddStudent(false);
+      setAddStudentGrade('');
+      setAddStudentClass('');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       alert(msg || 'Failed to add student');
@@ -417,8 +452,17 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
                       onChange={(e) => setFilterClass(e.target.value)}
                     >
                       <option value="">All Classes</option>
-                      <option value="A">A</option>
-                      <option value="B">B</option>
+                      {filterGrade ? (
+                        // Show classes for selected grade
+                        (CLASSES_BY_GRADE[filterGrade] || []).map((cls) => (
+                          <option key={cls} value={cls}>{cls}</option>
+                        ))
+                      ) : (
+                        // Show all classes if no grade filter
+                        Object.values(CLASSES_BY_GRADE).flat().map((cls) => (
+                          <option key={cls} value={cls}>{cls}</option>
+                        ))
+                      )}
                     </select>
                   </div>
                   <Button size="sm" onClick={() => setShowAddStudent(true)}>
@@ -459,23 +503,50 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
                           </div>
                           <div>
                             <label htmlFor="studentGrade" className="block text-sm font-medium mb-1">Grade</label>
-                            <select id="studentGrade" name="studentGrade" className="h-11 w-full rounded-xl border-2 border-input px-4">
+                            <select 
+                              id="studentGrade" 
+                              name="studentGrade" 
+                              value={addStudentGrade}
+                              onChange={(e) => {
+                                setAddStudentGrade(e.target.value);
+                                setAddStudentClass(''); // Reset class when grade changes
+                              }}
+                              className="h-11 w-full rounded-xl border-2 border-input px-4"
+                            >
                               <option value="">—</option>
-                              {[3, 4, 5, 6, 7].map((g) => <option key={g} value={g}>{g}</option>)}
+                              {[3, 4, 5, 6, 7].map((g) => <option key={g} value={g.toString()}>Grade {g}</option>)}
                             </select>
                           </div>
                           <div>
                             <label htmlFor="studentClass" className="block text-sm font-medium mb-1">Class</label>
-                            <select id="studentClass" name="studentClass" className="h-11 w-full rounded-xl border-2 border-input px-4">
+                            <select 
+                              id="studentClass" 
+                              name="studentClass" 
+                              value={addStudentClass}
+                              onChange={(e) => setAddStudentClass(e.target.value)}
+                              className="h-11 w-full rounded-xl border-2 border-input px-4 disabled:opacity-50"
+                              disabled={!addStudentGrade}
+                            >
                               <option value="">—</option>
-                              <option value="A">A</option>
-                              <option value="B">B</option>
+                              {addStudentGrade && CLASSES_BY_GRADE[addStudentGrade]?.map((cls) => (
+                                <option key={cls} value={cls}>{cls}</option>
+                              ))}
                             </select>
                           </div>
                         </div>
                         <div className="flex gap-2">
                           <Button type="submit" disabled={submitting}>{submitting ? 'Adding...' : 'Add Student'}</Button>
-                          <Button type="button" variant="outline" onClick={() => setShowAddStudent(false)}>Cancel</Button>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => {
+                              setShowAddStudent(false);
+                              setAddStudentGrade('');
+                              setAddStudentClass('');
+                            }}
+                          >
+                            Cancel
+                          </Button>
                         </div>
                       </form>
                     </CardContent>
@@ -513,17 +584,35 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
                       <div className="flex gap-4 items-end">
                         <div>
                           <label htmlFor="bulkEditGrade" className="block text-sm font-medium mb-1">Grade</label>
-                          <select id="bulkEditGrade" className="h-11 rounded-xl border-2 border-input px-4" value={bulkEditGrade} onChange={(e) => setBulkEditGrade(e.target.value)}>
+                          <select 
+                            id="bulkEditGrade" 
+                            className="h-11 rounded-xl border-2 border-input px-4" 
+                            value={bulkEditGrade} 
+                            onChange={(e) => {
+                              setBulkEditGrade(e.target.value);
+                              setBulkEditClass(''); // Reset class when grade changes
+                            }}
+                          >
                             <option value="">—</option>
-                            {[3, 4, 5, 6, 7].map((g) => <option key={g} value={g}>{g}</option>)}
+                            {[3, 4, 5, 6, 7].map((g) => <option key={g} value={g.toString()}>Grade {g}</option>)}
                           </select>
                         </div>
                         <div>
                           <label htmlFor="bulkEditClass" className="block text-sm font-medium mb-1">Class</label>
-                          <select id="bulkEditClass" className="h-11 rounded-xl border-2 border-input px-4" value={bulkEditClass} onChange={(e) => setBulkEditClass(e.target.value)}>
+                          <select 
+                            id="bulkEditClass" 
+                            className="h-11 rounded-xl border-2 border-input px-4 disabled:opacity-50" 
+                            value={bulkEditClass} 
+                            onChange={(e) => setBulkEditClass(e.target.value)}
+                            disabled={!bulkEditGrade}
+                          >
                             <option value="">—</option>
-                            <option value="A">A</option>
-                            <option value="B">B</option>
+                            {bulkEditGrade && CLASSES_BY_GRADE[bulkEditGrade]?.map((cls) => (
+                              <option key={cls} value={cls}>{cls}</option>
+                            ))}
+                            {!bulkEditGrade && ['3SC', '3SCA', '3TB', '4KM', '4DA', '4KW', '5EF', '5JS', '5AM', '6A', '6B', '6C', '7A', '7B', '7C'].map((cls) => (
+                              <option key={cls} value={cls}>{cls}</option>
+                            ))}
                           </select>
                         </div>
                         <Button onClick={handleBulkEditStudents} disabled={submitting || (!bulkEditGrade && !bulkEditClass)}>

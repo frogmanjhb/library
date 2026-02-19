@@ -6,12 +6,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 
+// Class codes by grade
+const CLASSES_BY_GRADE: Record<number, string[]> = {
+  3: ['3SC', '3SCA', '3TB'],
+  4: ['4KM', '4DA', '4KW'],
+  5: ['5EF', '5JS', '5AM'],
+  6: ['6A', '6B', '6C'],
+  7: ['7A', '7B', '7C'],
+};
+
 export const SignUp = () => {
   const navigate = useNavigate();
   const { user, login } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     surname: '',
+    grade: '',
     class: '',
     lexileLevel: '',
     email: '',
@@ -33,7 +43,14 @@ export const SignUp = () => {
     }
   }, [user, navigate]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Reset class when grade changes
+  useEffect(() => {
+    if (formData.grade && !CLASSES_BY_GRADE[Number(formData.grade)]?.includes(formData.class)) {
+      setFormData((prev) => ({ ...prev, class: '' }));
+    }
+  }, [formData.grade]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setError('');
   };
@@ -101,16 +118,44 @@ export const SignUp = () => {
               </div>
             </div>
 
-            <div>
-              <Input
-                name="class"
-                type="text"
-                placeholder="Class (e.g. 3A)"
-                value={formData.class}
-                onChange={handleChange}
-                required
-                className="h-12"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="grade" className="block text-sm font-medium mb-1 text-muted-foreground">
+                  Grade
+                </label>
+                <select
+                  name="grade"
+                  id="grade"
+                  value={formData.grade}
+                  onChange={handleChange}
+                  required
+                  className="h-12 w-full rounded-xl border-2 border-input bg-background px-4 py-2 text-sm"
+                >
+                  <option value="">Select Grade</option>
+                  {[3, 4, 5, 6, 7].map((g) => (
+                    <option key={g} value={g}>Grade {g}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="class" className="block text-sm font-medium mb-1 text-muted-foreground">
+                  Class
+                </label>
+                <select
+                  name="class"
+                  id="class"
+                  value={formData.class}
+                  onChange={handleChange}
+                  required
+                  disabled={!formData.grade}
+                  className="h-12 w-full rounded-xl border-2 border-input bg-background px-4 py-2 text-sm disabled:opacity-50"
+                >
+                  <option value="">Select Class</option>
+                  {formData.grade && CLASSES_BY_GRADE[Number(formData.grade)]?.map((cls) => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div>

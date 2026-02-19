@@ -93,11 +93,12 @@ export const updateUser = async (
 
   Object.entries(updates).forEach(([key, value]) => {
     if (value !== undefined) {
-      const dbKey = key === 'passwordHash' ? '"passwordHash"' : 
-                   key === 'googleId' ? '"googleId"' :
-                   key === 'lexileLevel' ? '"lexileLevel"' :
-                   key === 'createdAt' ? '"createdAt"' :
-                   key === 'updatedAt' ? '"updatedAt"' : key;
+      // Map JavaScript camelCase keys to database column names
+      const dbKey = key === 'passwordHash' ? 'passwordHash' : 
+                   key === 'googleId' ? 'googleId' :
+                   key === 'lexileLevel' ? 'lexileLevel' :
+                   key === 'createdAt' ? 'createdAt' :
+                   key === 'updatedAt' ? 'updatedAt' : key;
       fields.push(`"${dbKey}" = $${paramCount}`);
       values.push(value);
       paramCount++;
@@ -466,18 +467,19 @@ export const updateBook = async (
 
   Object.entries(updates).forEach(([key, value]) => {
     if (value !== undefined) {
-      const dbKey = key === 'lexileLevel' ? '"lexileLevel"' :
-                   key === 'wordCount' ? '"wordCount"' :
-                   key === 'ageRange' ? '"ageRange"' :
-                   key === 'coverUrl' ? '"coverUrl"' :
-                   key === 'userId' ? '"userId"' :
-                   key === 'verifiedAt' ? '"verifiedAt"' :
-                   key === 'verifiedById' ? '"verifiedById"' :
-                   key === 'verificationNote' ? '"verificationNote"' :
-                   key === 'pointsAwarded' ? '"pointsAwarded"' :
-                   key === 'pointsAwardedValue' ? '"pointsAwardedValue"' :
-                   key === 'createdAt' ? '"createdAt"' :
-                   key === 'updatedAt' ? '"updatedAt"' : key;
+      // Map JavaScript camelCase keys to database column names (which may need quotes)
+      const dbKey = key === 'lexileLevel' ? 'lexileLevel' :
+                   key === 'wordCount' ? 'wordCount' :
+                   key === 'ageRange' ? 'ageRange' :
+                   key === 'coverUrl' ? 'coverUrl' :
+                   key === 'userId' ? 'userId' :
+                   key === 'verifiedAt' ? 'verifiedAt' :
+                   key === 'verifiedById' ? 'verifiedById' :
+                   key === 'verificationNote' ? 'verificationNote' :
+                   key === 'pointsAwarded' ? 'pointsAwarded' :
+                   key === 'pointsAwardedValue' ? 'pointsAwardedValue' :
+                   key === 'createdAt' ? 'createdAt' :
+                   key === 'updatedAt' ? 'updatedAt' : key;
       fields.push(`"${dbKey}" = $${paramCount}`);
       values.push(value);
       paramCount++;
