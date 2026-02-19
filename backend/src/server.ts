@@ -4,7 +4,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import './types/express'; // Load Express type augmentations
 
 // Load .env from backend root (works around npm workspace cwd)
 dotenv.config({ path: path.resolve(__dirname, '../.env') });

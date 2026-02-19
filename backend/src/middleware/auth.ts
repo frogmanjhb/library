@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 import { Role, User as DatabaseUser } from '../types/database';
 import { AppError } from './errorHandler';
 import { getUserById } from '../lib/db-helpers';
-import '../types/express'; // Ensure Express types are loaded
 
 interface JWTPayload {
   userId: string;
