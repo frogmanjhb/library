@@ -127,9 +127,6 @@ export const BookCard: React.FC<BookCardProps> = ({
             {book.lexileLevel && (
               <Badge variant="outline">Lexile: {book.lexileLevel}L</Badge>
             )}
-            {book.wordCount && (
-              <Badge variant="outline">{book.wordCount.toLocaleString()} words</Badge>
-            )}
             {pointsInfo && (
               <Badge 
                 className={`${

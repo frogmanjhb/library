@@ -31,7 +31,6 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
     rating: 5,
     comment: '',
     lexileLevel: '',
-    wordCount: '',
     ageRange: '',
     genres: '',
     coverUrl: '',
@@ -47,7 +46,6 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
         rating: book.rating || 5,
         comment: book.comment || '',
         lexileLevel: book.lexileLevel?.toString() || '',
-        wordCount: book.wordCount?.toString() || '',
         ageRange: book.ageRange || '',
         genres: book.genres?.join(', ') || '',
         coverUrl: book.coverUrl || '',
@@ -84,7 +82,6 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
       const data = {
         ...formData,
         lexileLevel: formData.lexileLevel ? parseInt(formData.lexileLevel) : null,
-        wordCount: formData.wordCount ? parseInt(formData.wordCount) : null,
         genres: formData.genres ? formData.genres.split(',').map(g => g.trim()) : [],
       };
 
@@ -183,39 +180,29 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
         {renderStarSelector()}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Book Lexile Level
-          </label>
-          <Input
-            type="number"
-            value={formData.lexileLevel}
-            onChange={(e) => setFormData({ ...formData, lexileLevel: e.target.value })}
-            placeholder="Enter Lexile Level"
-          />
-          {expectedPoints !== null && (
-            <p className={`text-xs mt-1 font-medium ${
-              expectedPoints === 3 ? 'text-emerald-600' : 
-              expectedPoints === 2 ? 'text-blue-600' : 'text-amber-600'
-            }`}>
-              Expected: {expectedPoints} point{expectedPoints !== 1 ? 's' : ''} 
-              {expectedPoints === 3 ? ' (above your level!)' : 
-               expectedPoints === 2 ? ' (at your level)' : ' (below your level)'}
-            </p>
-          )}
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Word Count
-          </label>
-          <Input
-            type="number"
-            value={formData.wordCount}
-            onChange={(e) => setFormData({ ...formData, wordCount: e.target.value })}
-            placeholder="Enter Word Count"
-          />
-        </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">
+          Book Lexile Level
+        </label>
+        <Input
+          type="number"
+          value={formData.lexileLevel}
+          onChange={(e) => setFormData({ ...formData, lexileLevel: e.target.value })}
+          placeholder="Enter Lexile Level"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          💡 Look at the top right corner of the first page in your library book for the lexile level.
+        </p>
+        {expectedPoints !== null && (
+          <p className={`text-xs mt-1 font-medium ${
+            expectedPoints === 3 ? 'text-emerald-600' : 
+            expectedPoints === 2 ? 'text-blue-600' : 'text-amber-600'
+          }`}>
+            Expected: {expectedPoints} point{expectedPoints !== 1 ? 's' : ''} 
+            {expectedPoints === 3 ? ' (above your level!)' : 
+             expectedPoints === 2 ? ' (at your level)' : ' (below your level)'}
+          </p>
+        )}
       </div>
 
       <div>

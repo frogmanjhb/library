@@ -279,7 +279,7 @@ router.put('/:id', requireAuth, asyncHandler(async (req, res) => {
 // Verify (approve/reject) a book
 router.patch('/:id/verification', requireAuth, requireLibrarian, asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { status, note } = req.body as { status?: string; note?: string };
+  const { status, note, points } = req.body as { status?: string; note?: string; points?: number };
   const user = req.user!;
 
   const statusValue = status?.toString().toUpperCase();
@@ -333,16 +333,33 @@ router.patch('/:id/verification', requireAuth, requireLibrarian, asyncHandler(as
     }
   };
 
-  const currentPoints = await calculateLexilePoints(existingBook.lexileLevel, existingBook.userId);
+  // Use provided points if given, otherwise calculate based on lexile
+  let pointsToAward: number;
+  if (targetStatus === BookStatus.APPROVED) {
+    if (points !== undefined && points !== null) {
+      // Validate provided points
+      const pointsNum = typeof points === 'number' ? points : parseInt(String(points), 10);
+      if (isNaN(pointsNum) || pointsNum < 0) {
+        throw new AppError('Points must be a valid number greater than or equal to 0', 400);
+      }
+      pointsToAward = pointsNum;
+    } else {
+      // Fall back to calculated points
+      pointsToAward = await calculateLexilePoints(existingBook.lexileLevel, existingBook.userId);
+    }
+  } else {
+    pointsToAward = 0;
+  }
+
   const previouslyAwarded = existingBook.pointsAwardedValue ?? 0;
 
   if (targetStatus === BookStatus.APPROVED) {
     updateData.pointsAwarded = true;
-    updateData.pointsAwardedValue = currentPoints;
+    updateData.pointsAwardedValue = pointsToAward;
     if (!existingBook.pointsAwarded) {
-      pointsAdjustment = currentPoints;
+      pointsAdjustment = pointsToAward;
     } else {
-      pointsAdjustment = currentPoints - previouslyAwarded;
+      pointsAdjustment = pointsToAward - previouslyAwarded;
     }
   } else {
     if (existingBook.pointsAwarded) {

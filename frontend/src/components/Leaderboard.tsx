@@ -24,7 +24,6 @@ export const Leaderboard = () => {
   const { user } = useAuth();
   const [gradeLeaderboard, setGradeLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [schoolLeaderboard, setSchoolLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [wordsLeaderboard, setWordsLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [lexileLeaderboard, setLexileLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,16 +43,14 @@ export const Leaderboard = () => {
 
   const fetchLeaderboards = async () => {
     try {
-      const [grade, school, words, lexile] = await Promise.all([
+      const [grade, school, lexile] = await Promise.all([
         user?.grade ? api.get(`/api/leaderboard/by-grade?grade=${user.grade}`) : Promise.resolve({ data: [] }),
         api.get('/api/leaderboard/school'),
-        api.get('/api/leaderboard/words'),
         api.get('/api/leaderboard/lexile'),
       ]);
 
       setGradeLeaderboard(grade.data);
       setSchoolLeaderboard(school.data);
-      setWordsLeaderboard(words.data);
       setLexileLeaderboard(lexile.data);
     } catch (error) {
       console.error('Error fetching leaderboards:', error);
@@ -115,11 +112,6 @@ export const Leaderboard = () => {
                       {entry.totalPoints}
                     </Badge>
                   )}
-                  {type === 'words' && entry.totalWords !== undefined && (
-                    <Badge variant="secondary" className="font-bold">
-                      {entry.totalWords.toLocaleString()} words
-                    </Badge>
-                  )}
                   {type === 'lexile' && entry.avgLexile !== undefined && (
                     <Badge variant="secondary" className="font-bold">
                       {entry.avgLexile}L avg
@@ -147,10 +139,9 @@ export const Leaderboard = () => {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="grade">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="grade">Grade</TabsTrigger>
             <TabsTrigger value="school">School</TabsTrigger>
-            <TabsTrigger value="words">Words</TabsTrigger>
             <TabsTrigger value="lexile">Lexile</TabsTrigger>
           </TabsList>
 
@@ -160,10 +151,6 @@ export const Leaderboard = () => {
 
           <TabsContent value="school" className="mt-4">
             {renderLeaderboardTable(schoolLeaderboard, 'points')}
-          </TabsContent>
-
-          <TabsContent value="words" className="mt-4">
-            {renderLeaderboardTable(wordsLeaderboard, 'words')}
           </TabsContent>
 
           <TabsContent value="lexile" className="mt-4">

@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { CommentModal } from '../teacher/CommentModal';
 import { LibraryManagementModal } from '@/components/LibraryManagementModal';
+import { ApproveBookModal } from '@/components/ApproveBookModal';
 import { useNavigate } from 'react-router-dom';
 
 export const LibrarianDashboard = () => {
@@ -23,6 +24,7 @@ export const LibrarianDashboard = () => {
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [editingBook, setEditingBook] = useState<any | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [approvingBook, setApprovingBook] = useState<any | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGrade, setFilterGrade] = useState('');
   const [filterClass, setFilterClass] = useState('');
@@ -113,28 +115,36 @@ export const LibrarianDashboard = () => {
   };
 
   const handleVerifyBook = async (bookId: string, status: 'APPROVED' | 'REJECTED') => {
-    try {
-      let note: string | undefined;
-      if (status === 'REJECTED') {
+    if (status === 'APPROVED') {
+      // Find the book and show approval modal
+      const book = pendingBooks.find((b: any) => b.id === bookId) || books.find((b: any) => b.id === bookId);
+      if (book) {
+        setApprovingBook(book);
+      }
+    } else {
+      // Rejection flow - keep existing prompt behavior
+      try {
         const reason = window.prompt('Please provide feedback for the student before rejecting this book.');
         if (reason === null || !reason.trim()) {
           alert('Feedback is required to reject a book.');
           return;
         }
-        note = reason.trim();
-      } else {
-        const optionalNote = window.prompt('Optional message to the student (press Cancel to skip).');
-        if (optionalNote && optionalNote.trim()) {
-          note = optionalNote.trim();
-        }
-      }
 
-      await api.patch(`/api/books/${bookId}/verification`, { status, note });
-      await fetchData();
-    } catch (error) {
-      console.error('Error updating verification status:', error);
-      alert('Failed to update verification status. Please try again.');
+        await api.patch(`/api/books/${bookId}/verification`, {
+          status: 'REJECTED',
+          note: reason.trim(),
+        });
+        await fetchData();
+      } catch (error) {
+        console.error('Error updating verification status:', error);
+        alert('Failed to update verification status. Please try again.');
+      }
     }
+  };
+
+  const handleBookApproved = async () => {
+    await fetchData();
+    setApprovingBook(null);
   };
 
   const handleEditBook = (book: any) => {
@@ -160,7 +170,6 @@ export const LibrarianDashboard = () => {
     );
   }
 
-  const totalWords = books.reduce((sum: number, b: any) => sum + (b.wordCount || 0), 0);
   const avgRating = books.length > 0
     ? (books.reduce((sum: number, b: any) => sum + b.rating, 0) / books.length).toFixed(1)
     : '0';
@@ -191,7 +200,7 @@ export const LibrarianDashboard = () => {
         <AnnouncementBanner announcements={announcements} />
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -223,19 +232,6 @@ export const LibrarianDashboard = () => {
             <CardContent>
               <div className="text-3xl font-bold text-secondary">
                 {new Set(books.map((b: any) => b.userId)).size}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Words Read
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">
-                {totalWords.toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -554,6 +550,13 @@ export const LibrarianDashboard = () => {
         isOpen={showLibraryManagement}
         onClose={() => setShowLibraryManagement(false)}
         onDataChanged={fetchData}
+      />
+
+      <ApproveBookModal
+        book={approvingBook}
+        isOpen={!!approvingBook}
+        onClose={() => setApprovingBook(null)}
+        onApproved={handleBookApproved}
       />
     </div>
   );

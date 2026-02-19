@@ -84,7 +84,6 @@ export const BookLogTable: React.FC<BookLogTableProps> = ({
               {showStudent && <th className="text-left p-4 font-semibold">Student</th>}
               <th className="text-left p-4 font-semibold">Rating</th>
               <th className="text-left p-4 font-semibold">Lexile</th>
-              <th className="text-left p-4 font-semibold">Words</th>
               <th className="text-left p-4 font-semibold">Date</th>
               {showActions && <th className="text-left p-4 font-semibold">Actions</th>}
             </tr>
@@ -129,13 +128,6 @@ export const BookLogTable: React.FC<BookLogTableProps> = ({
                 <td className="p-4">
                   {book.lexileLevel ? (
                     <Badge variant="outline">{book.lexileLevel}L</Badge>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">-</span>
-                  )}
-                </td>
-                <td className="p-4">
-                  {book.wordCount ? (
-                    <span className="text-sm">{book.wordCount.toLocaleString()}</span>
                   ) : (
                     <span className="text-xs text-muted-foreground">-</span>
                   )}

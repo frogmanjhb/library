@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { BookOpen, Plus, LogOut, TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { BookCard } from '@/components/BookCard';
 import { PointsBadge } from '@/components/PointsBadge';
+import { PointsSystemPanel } from '@/components/PointsSystemPanel';
 import { AnnouncementBanner } from '@/components/AnnouncementBanner';
-import { Leaderboard } from '@/components/Leaderboard';
 import { AddBookModal } from './AddBookModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
@@ -133,42 +134,6 @@ export const StudentDashboard = () => {
     fetchData();
   };
 
-  const totalWordsRead = stats.totalWords ?? 0;
-
-  const badgeTiers = [
-    {
-      id: 'bronze',
-      name: 'Bronze Bookworm',
-      wordsRequired: 100000,
-      imageSrc: '/images/BronzeBadge.png',
-      description: 'Read 100,000 words to earn your very first badge.',
-    },
-    {
-      id: 'gold',
-      name: 'Gold Scholar',
-      wordsRequired: 500000,
-      imageSrc: '/images/GoldBadge.png',
-      description: 'Keep up the momentum! Read 500,000 words to shine in gold.',
-    },
-    {
-      id: 'diamond',
-      name: 'Diamond Luminary',
-      wordsRequired: 1000000,
-      imageSrc: '/images/DiamondBadge.png',
-      description: 'One million words makes you a legend of the library.',
-    },
-  ];
-
-  const badges = badgeTiers.map((badge) => {
-    const progress = Math.min(totalWordsRead / badge.wordsRequired, 1);
-    return {
-      ...badge,
-      earned: totalWordsRead >= badge.wordsRequired,
-      progress: Number.isFinite(progress) ? progress : 0,
-      remainingWords: Math.max(badge.wordsRequired - totalWordsRead, 0),
-    };
-  });
-
   const pendingCount = books.filter((b) => b.status === 'PENDING').length;
   const rejectedCount = books.filter((b) => b.status === 'REJECTED').length;
 
@@ -205,24 +170,24 @@ export const StudentDashboard = () => {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-6 space-y-8">
         <AnnouncementBanner announcements={announcements} />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        {/* Stats Cards - Top Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card>
+            <Card className="h-full hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                   Books Read
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-primary">{stats.totalBooks}</div>
+                <div className="text-4xl font-bold text-primary">{stats.totalBooks}</div>
               </CardContent>
             </Card>
           </motion.div>
@@ -232,34 +197,15 @@ export const StudentDashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Card>
+            <Card className="h-full hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Words
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-secondary">
-                  {stats.totalWords.toLocaleString()}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                   Your Lexile Level
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2">
-                  <span className="text-3xl font-bold text-green-600">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-4xl font-bold text-green-600">
                     {currentLexile ? `${currentLexile}L` : '-'}
                   </span>
                   {lexileTrend !== null && (
@@ -278,7 +224,7 @@ export const StudentDashboard = () => {
                   )}
                 </div>
                 {currentLexile && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground">
                     Term {currentTerm}, {currentYear}
                   </p>
                 )}
@@ -289,16 +235,16 @@ export const StudentDashboard = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.3 }}
           >
-            <Card>
+            <Card className="h-full hover:shadow-lg transition-shadow">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
                   Avg Book Lexile
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-blue-600">
+                <div className="text-4xl font-bold text-blue-600">
                   {stats.avgLexile}L
                 </div>
               </CardContent>
@@ -306,183 +252,131 @@ export const StudentDashboard = () => {
           </motion.div>
         </div>
 
-        {/* Badges */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="mb-10"
-        >
-          <Card className="border-2 border-primary/10 shadow-cardHover bg-gradient-to-br from-white via-amber-50/30 to-orange-50/30">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-semibold text-primary">
-                Collectable Reading Badges
-              </CardTitle>
-              <p className="text-muted-foreground text-sm max-w-2xl">
-                Every badge celebrates huge reading milestones. Keep reading to unlock them all
-                and watch this trophy shelf fill up!
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {badges.map((badge) => (
-                  <div
-                    key={badge.id}
-                    className={`relative h-full rounded-2xl border p-5 backdrop-blur-sm transition duration-300 ${
-                      badge.earned
-                        ? 'border-emerald-300 bg-emerald-50/80 shadow-lg shadow-emerald-100'
-                        : 'border-slate-200 bg-white/70 hover:-translate-y-1'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center text-center gap-3">
-                      <div className="relative">
-                        <div className="h-28 w-28 rounded-3xl bg-white/80 shadow-inner flex items-center justify-center overflow-hidden">
-                          <img
-                            src={badge.imageSrc}
-                            alt={`${badge.name} badge`}
-                            className={`h-24 w-24 object-contain drop-shadow-lg ${
-                              badge.earned ? '' : 'opacity-70 grayscale'
-                            }`}
-                          />
-                        </div>
-                        {badge.earned && (
-                          <span className="absolute -top-2 -right-2 rounded-full bg-emerald-500 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-white shadow-md">
-                            Earned
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-primary">{badge.name}</h3>
-                        <p className="text-sm text-muted-foreground">{badge.description}</p>
-                      </div>
-                      <div className="w-full space-y-2">
-                        <div className="flex justify-between text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                          <span>Progress</span>
-                          <span>{Math.round(badge.progress * 100)}%</span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                          <div
-                            className={`h-full rounded-full transition-[width] duration-500 ${
-                              badge.earned ? 'bg-emerald-400' : 'bg-primary/70'
-                            }`}
-                            style={{ width: `${badge.progress * 100}%` }}
-                          />
-                        </div>
-                        {badge.earned ? (
-                          <p className="text-xs font-semibold text-emerald-600">
-                            Amazing! You&apos;ve unlocked this badge.
-                          </p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">
-                            {badge.remainingWords.toLocaleString()} words to go.
-                          </p>
-                        )}
-                        {!badge.earned && badge.id !== 'bronze' && (
-                          <p className="text-[11px] italic text-slate-400">
-                            Badge artwork coming soon!
-                          </p>
-                        )}
+        {/* Reading XP and Add Book Section */}
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col lg:flex-row gap-6 items-stretch">
+            {/* Reading XP Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="flex-1"
+            >
+              <Card className="h-full hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="text-xl">Reading XP</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col md:flex-row md:items-center gap-6">
+                    {/* Level Display */}
+                    <div className="flex items-center gap-3">
+                      <Badge
+                        variant="default"
+                        className="text-3xl font-extrabold px-4 py-2 h-auto"
+                      >
+                        Level {Math.floor(points / 100) + 1}
+                      </Badge>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="flex-1 space-y-2">
+                      <Progress value={((points % 100) / 100) * 100} className="h-3" />
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>
+                          {(points % 100).toLocaleString()} / 100 XP
+                        </span>
+                        <span>Level {Math.floor(points / 100) + 1}</span>
                       </div>
                     </div>
+
+                    {/* Next Unlock */}
+                    <div className="md:text-right">
+                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
+                        Next unlock
+                      </div>
+                      <div className="text-sm font-semibold">Level {Math.floor(points / 100) + 2}</div>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="mybooks" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-md">
-            <TabsTrigger value="mybooks">My Books</TabsTrigger>
-            <TabsTrigger value="add">Add Book</TabsTrigger>
-            <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="mybooks">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">My Reading Log</h2>
+            {/* Add Book Button */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="w-full lg:w-auto lg:min-w-[280px] flex items-stretch"
+            >
               <Button
                 onClick={handleAddBook}
                 size="lg"
-                className="gap-2"
+                className="w-full h-full min-h-[160px] text-xl lg:text-2xl font-extrabold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all py-10 px-12"
               >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Book
+                <Plus className="w-8 h-8 mr-3" />
+                ADD BOOK
               </Button>
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Reading Tiers Card */}
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <PointsSystemPanel currentPoints={points} showMaterialsOnly={true} />
+          </motion.div>
+        </div>
+
+        {/* Reading Log */}
+        <div className="space-y-6 max-w-6xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-3xl font-bold">Reading Log</h2>
+          </div>
+
+          {(pendingCount > 0 || rejectedCount > 0) && (
+            <div className="space-y-2 mb-4">
+              {pendingCount > 0 && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  You have {pendingCount} book{pendingCount > 1 ? 's' : ''} awaiting librarian verification.
+                  You will earn points based on book difficulty (1-3 points) once approved.
+                </div>
+              )}
+              {rejectedCount > 0 && (
+                <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+                  {rejectedCount} book{rejectedCount > 1 ? 's need' : ' needs'} updates based on librarian feedback.
+                  Open the card to see notes and resubmit when ready.
+                </div>
+              )}
             </div>
+          )}
 
-            {(pendingCount > 0 || rejectedCount > 0) && (
-              <div className="space-y-2 mb-4">
-                {pendingCount > 0 && (
-                  <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                    You have {pendingCount} book{pendingCount > 1 ? 's' : ''} awaiting librarian verification.
-                    You will earn points based on book difficulty (1-3 points) once approved.
-                  </div>
-                )}
-                {rejectedCount > 0 && (
-                  <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-                    {rejectedCount} book{rejectedCount > 1 ? 's need' : ' needs'} updates based on librarian feedback.
-                    Open the card to see notes and resubmit when ready.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {books.length === 0 ? (
-              <Card className="p-12 text-center">
-                <BookOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-xl font-semibold mb-2">No books yet!</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start logging the books you've read to earn points! Books above your lexile level earn 3 points, at your level earn 2 points, and below earn 1 point.
-                </p>
-                <Button
-                  onClick={handleAddBook}
-                  size="lg"
-                  className="gap-2"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Log Your First Book
-                </Button>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {books.map((book) => (
-                  <BookCard
-                    key={book.id}
-                    book={book}
-                    onEdit={handleEditBook}
-                    onDelete={handleDeleteBook}
-                    showActions={true}
-                    studentLexile={currentLexile}
-                  />
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="add">
-            <Card>
-              <CardHeader>
-                <CardTitle>Log a New Book</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AddBookModal
-                  isOpen={true}
-                  onClose={() => {}}
-                  onSaved={handleBookSaved}
-                  book={null}
-                  inline={true}
+          {books.length === 0 ? (
+            <Card className="p-12 text-center">
+              <BookOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No books yet!</h3>
+              <p className="text-muted-foreground mb-4">
+                Your reading log will appear here once books are logged.
+              </p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {books.map((book) => (
+                <BookCard
+                  key={book.id}
+                  book={book}
+                  onEdit={handleEditBook}
+                  onDelete={handleDeleteBook}
+                  showActions={true}
                   studentLexile={currentLexile}
                 />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="leaderboard">
-            <Leaderboard />
-          </TabsContent>
-        </Tabs>
+              ))}
+            </div>
+          )}
+        </div>
       </main>
 
       {/* Add/Edit Book Modal */}
