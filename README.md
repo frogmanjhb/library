@@ -36,7 +36,7 @@ A comprehensive web application for tracking student reading progress, built for
 **Backend:**
 - Node.js + Express + TypeScript
 - Passport.js (Google OAuth authentication)
-- Prisma ORM
+- pg (node-postgres) - PostgreSQL client
 - Socket.io (realtime features)
 - JWT (session management)
 
@@ -108,13 +108,11 @@ Follow the detailed guide in [GOOGLE_OAUTH_SETUP.md](./GOOGLE_OAUTH_SETUP.md) to
 - Restrict to @stpeters.co.za domain
 - Configure consent screen
 
-### 6. Run Database Migrations
+### 6. Database Setup
 
-```bash
-npm run migrate
-```
+The database schema should already exist. If you need to create tables manually, refer to the Prisma schema file (`prisma/schema.prisma`) and create the tables using SQL or Prisma migrations.
 
-This will create all necessary tables in your Postgres database.
+**Note:** This project uses `pg` (node-postgres) for database access. The Prisma schema file is kept for reference only.
 
 ### 7. Seed the Database (Optional)
 
@@ -169,7 +167,7 @@ library-reading-tracker/
 │   │   ├── lib/            # Utilities (Prisma client)
 │   │   └── server.ts       # Server entry point
 │   └── package.json
-├── prisma/                  # Database schema and migrations
+├── prisma/                  # Database schema (reference only, migrations handled via SQL)
 │   └── schema.prisma
 ├── scripts/                 # Utility scripts
 │   └── seed.ts             # Database seeding script
@@ -184,7 +182,7 @@ library-reading-tracker/
 **Comments** - Teacher feedback on books
 **Announcements** - School-wide messages
 
-See [prisma/schema.prisma](./prisma/schema.prisma) for the complete schema.
+See [prisma/schema.prisma](./prisma/schema.prisma) for the database schema reference. The application uses `pg` (node-postgres) for database access.
 
 ## 🔐 Authentication & Authorization
 

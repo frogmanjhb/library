@@ -46,8 +46,8 @@ The application consists of three Railway services:
 2. Go to **Settings** tab:
    - **Name**: `library-tracker-backend`
    - **Root Directory**: `/backend`
-   - **Build Command**: `npm install && npm run prisma:generate && npm run build`
-   - **Start Command**: `npm run migrate:deploy && npm run start`
+   - **Build Command**: `npm install && npm run build`
+   - **Start Command**: `npm start`
 
 3. Go to **Variables** tab and add:
    ```env
@@ -315,8 +315,8 @@ Access via service → **Metrics** tab
 # Force rebuild
 railway up --service backend
 
-# Check Prisma
-railway run npx prisma generate --workspace=backend
+# Check database connection
+railway run node -e "const { Pool } = require('pg'); const pool = new Pool({ connectionString: process.env.DATABASE_URL }); pool.query('SELECT NOW()').then(() => { console.log('Connected!'); pool.end(); })"
 ```
 
 ### Frontend Shows API Errors
@@ -342,7 +342,7 @@ railway run npx prisma generate --workspace=backend
 
 **Test connection:**
 ```bash
-railway run node -e "const { PrismaClient } = require('@prisma/client'); new PrismaClient().\$connect().then(() => console.log('Connected!'))"
+railway run node -e "const { Pool } = require('pg'); const pool = new Pool({ connectionString: process.env.DATABASE_URL }); pool.query('SELECT NOW()').then(() => { console.log('Connected!'); pool.end(); })"
 ```
 
 ### Build Fails

@@ -45,7 +45,7 @@ Your application is now **fully deployed and operational** on Railway!
 - ✅ Express + TypeScript
 - ✅ JWT authentication
 - ✅ Role-based authorization
-- ✅ PostgreSQL with Prisma ORM
+- ✅ PostgreSQL with pg (node-postgres)
 - ✅ REST API for all resources
 - ✅ Socket.io for real-time updates
 - ✅ CORS configured
@@ -108,7 +108,7 @@ VITE_API_URL=https://librarytracker-backend.up.railway.app
 ## 📦 Tech Stack
 
 - **Frontend:** React 18, TypeScript, Vite, TailwindCSS, shadcn/ui
-- **Backend:** Express, TypeScript, Prisma ORM
+- **Backend:** Express, TypeScript, pg (node-postgres)
 - **Database:** PostgreSQL (Railway)
 - **Auth:** JWT, Passport.js (simplified email auth for dev)
 - **Real-time:** Socket.io
@@ -193,8 +193,8 @@ npm install
 # Setup local .env files with public Railway URLs
 # backend/.env: DATABASE_URL=postgresql://...@ballast.proxy.rlwy.net:50141/railway
 
-# Generate Prisma client
-npm run prisma:generate --workspace=backend
+# Build backend (no Prisma client generation needed)
+npm run build --workspace=backend
 
 # Start backend
 npm run dev --workspace=backend

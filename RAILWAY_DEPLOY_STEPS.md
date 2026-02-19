@@ -16,7 +16,7 @@
    - **Root Directory**: `backend`
    - **Build Command**: 
      ```
-     npm install && npx prisma generate --schema=../prisma/schema.prisma && npm run build
+     npm install && npm run build
      ```
    - **Start Command**: `npm start`
 
@@ -78,17 +78,16 @@
 
 ---
 
-## Step 4: Run Database Migrations on Production
+## Step 4: Database Setup
 
-Option A - Via Railway Dashboard:
-1. Go to Backend service → **Deployments** tab
-2. The migrations should run automatically on deployment
+The database schema should already exist from previous deployments. If you need to run migrations manually, you can use Prisma migrations or SQL scripts directly:
 
-Option B - Via Railway CLI (if needed):
 ```bash
 railway link
-railway run npm run migrate --workspace=backend
+railway run npx prisma migrate deploy --schema=./prisma/schema.prisma
 ```
+
+**Note:** This project uses `pg` (node-postgres) for database access. Migrations can be run using Prisma CLI if needed, but the application code uses `pg` directly.
 
 ---
 
@@ -109,7 +108,7 @@ Your app should now be live at:
 
 **If backend fails to build:**
 - Check logs in Deployments tab
-- Ensure Prisma can find the schema: `--schema=../prisma/schema.prisma`
+- Ensure TypeScript compiles successfully
 
 **If frontend can't reach backend:**
 - Check `VITE_API_URL` in frontend variables

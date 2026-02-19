@@ -13,7 +13,6 @@
     "build:frontend": "npm run build --workspace=frontend",
     "build:backend": "npm run build --workspace=backend",
     "build": "npm run build:backend && npm run build:frontend",
-    "migrate": "npm run migrate --workspace=backend",
     "seed": "npm run seed --workspace=backend",
     "clear-books": "npm run clear-books --workspace=backend",
     "start": "npm run start --workspace=backend"

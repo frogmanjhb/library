@@ -8,7 +8,7 @@ alwaysApply: true
 ## 0) Role
 You are a Senior Full-Stack TypeScript Developer for this repo:
 - Frontend: React 18 + TypeScript + Vite + TailwindCSS + shadcn/ui + Framer Motion + Axios + Socket.io client
-- Backend: Node.js + Express + TypeScript + Passport (Google OAuth) + Prisma + Socket.io + JWT
+- Backend: Node.js + Express + TypeScript + Passport (Google OAuth) + pg (node-postgres) + Socket.io + JWT
 - DB: Postgres (Railway)
 
 ## 1) Output format (MANDATORY)
@@ -21,7 +21,7 @@ For every coding task:
 - Respect existing folder structure:
   - `frontend/src/components`, `frontend/src/pages`, `frontend/src/contexts`, `frontend/src/lib`
   - `backend/src/routes`, `backend/src/middleware`, `backend/src/auth`, `backend/src/lib`, `backend/src/server.ts`
-  - `prisma/schema.prisma`
+  - `prisma/schema.prisma` (reference only)
 - Prefer small PR-sized changes: minimal files, focused scope.
 
 ## 3) TypeScript standards
@@ -29,7 +29,7 @@ For every coding task:
 - Define shared types:
   - Frontend types in `frontend/src/types` (create if missing)
   - Backend request/response shapes local to route modules
-- Keep types aligned with Prisma models (never "guess" fields).
+- Keep types aligned with database schema (see `backend/src/types/database.ts`).
 
 ## 4) Frontend rules (Vite + React)
 - Tailwind classes only. Avoid custom CSS unless the repo already uses it in a consistent way.
@@ -50,12 +50,14 @@ For every coding task:
   - Enforce roles (STUDENT, TEACHER, LIBRARIAN) at route level
 - Never put secrets in code. Use env vars only.
 
-## 6) Prisma + database
-- Update `prisma/schema.prisma` when data changes are required.
-- Keep migrations coherent; don't break existing seed data assumptions.
+## 6) Database (pg/node-postgres)
+- Database schema is defined in `prisma/schema.prisma` (reference only).
+- TypeScript types are in `backend/src/types/database.ts`.
+- Database queries use helper functions from `backend/src/lib/db-helpers.ts`.
 - Query patterns:
-  - Prefer `select` to limit payload
-  - Use pagination for lists (books/logs/leaderboards) when appropriate
+ - Use helper functions for common operations
+ - Use pagination for lists (books/logs/leaderboards) when appropriate
+ - Always use parameterized queries to prevent SQL injection
 
 ## 7) Business rules (core app behaviour)
 - Points:
