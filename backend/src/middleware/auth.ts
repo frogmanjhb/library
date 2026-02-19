@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { Role } from '../types/database';
+import { Role, User as DatabaseUser } from '../types/database';
 import { AppError } from './errorHandler';
 import { getUserById } from '../lib/db-helpers';
+import '../types/express'; // Ensure Express types are loaded
 
 interface JWTPayload {
   userId: string;
@@ -68,8 +69,9 @@ export const requireRole = (...roles: Role[]) => {
       return next(new AppError('Authentication required', 401));
     }
 
-    const userRole = req.user.role as Role;
-    if (!roles.includes(userRole)) {
+    // Type assertion needed because Express.User might not have all properties
+    const user = req.user as DatabaseUser;
+    if (!roles.includes(user.role)) {
       return next(new AppError('Insufficient permissions', 403));
     }
 
