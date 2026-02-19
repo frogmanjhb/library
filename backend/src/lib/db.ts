@@ -1,4 +1,4 @@
-import { Pool, QueryResult } from 'pg';
+import { Pool, QueryResult, QueryResultRow } from 'pg';
 import fs from 'fs';
 import path from 'path';
 
@@ -31,7 +31,7 @@ pool.on('error', (err) => {
 });
 
 // Helper function to execute queries
-export const query = async <T = unknown>(
+export const query = async <T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: unknown[]
 ): Promise<QueryResult<T>> => {

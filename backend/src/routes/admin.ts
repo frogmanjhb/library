@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
+import { Role } from '../types/database';
 import {
   findUsers,
   getUserByEmail,
@@ -29,8 +30,8 @@ interface StudentCreateInput {
 router.get('/students', asyncHandler(async (req, res) => {
   const { grade, class: className } = req.query;
 
-  const where: { role: 'STUDENT'; grade?: number; class?: string } = {
-    role: 'STUDENT',
+  const where: { role: Role; grade?: number; class?: string } = {
+    role: Role.STUDENT,
   };
   if (grade !== undefined && grade !== '') {
     const g = parseInt(grade as string, 10);
@@ -93,7 +94,7 @@ router.post('/students', asyncHandler(async (req, res) => {
     const user = await createUser({
       email: s.email,
       name: s.name,
-      role: 'STUDENT',
+      role: Role.STUDENT,
       grade: s.grade ?? null,
       class: s.class ?? null,
     });

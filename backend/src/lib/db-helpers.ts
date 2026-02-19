@@ -238,7 +238,7 @@ export const getBookWithRelations = async (id: string): Promise<BookWithRelation
   );
 
   // Get verifiedBy
-  let verifiedBy = null;
+  let verifiedBy: User | null = null;
   if (book.verifiedById) {
     const verifiedByResult = await query<User>(
       'SELECT id, name, email FROM "User" WHERE id = $1',
@@ -366,7 +366,7 @@ export const findBooksWithRelations = async (
         [book.userId]
       );
 
-      let verifiedBy = null;
+      let verifiedBy: User | null = null;
       if (book.verifiedById) {
         const verifiedByResult = await query<User>(
           'SELECT id, name, email FROM "User" WHERE id = $1',

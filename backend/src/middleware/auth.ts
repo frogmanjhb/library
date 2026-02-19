@@ -68,7 +68,8 @@ export const requireRole = (...roles: Role[]) => {
       return next(new AppError('Authentication required', 401));
     }
 
-    if (!roles.includes(req.user.role)) {
+    const userRole = req.user.role as Role;
+    if (!roles.includes(userRole)) {
       return next(new AppError('Insufficient permissions', 403));
     }
 
@@ -77,11 +78,11 @@ export const requireRole = (...roles: Role[]) => {
 };
 
 // Middleware to check if user is a student
-export const requireStudent = requireRole('STUDENT');
+export const requireStudent = requireRole(Role.STUDENT);
 
 // Middleware to check if user is a teacher or librarian
-export const requireTeacher = requireRole('TEACHER', 'LIBRARIAN');
+export const requireTeacher = requireRole(Role.TEACHER, Role.LIBRARIAN);
 
 // Middleware to check if user is a librarian
-export const requireLibrarian = requireRole('LIBRARIAN');
+export const requireLibrarian = requireRole(Role.LIBRARIAN);
 

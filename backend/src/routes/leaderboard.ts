@@ -1,5 +1,5 @@
 import express from 'express';
-import { BookStatus } from '../types/database';
+import { BookStatus, Role } from '../types/database';
 import { requireAuth } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
 import {
@@ -20,7 +20,7 @@ router.get('/by-grade', requireAuth, asyncHandler(async (req, res) => {
   }
 
   const users = await findUsers({
-    role: 'STUDENT',
+    role: Role.STUDENT,
     grade: parseInt(grade as string),
   });
 
@@ -57,7 +57,7 @@ router.get('/by-grade', requireAuth, asyncHandler(async (req, res) => {
 
 // Get whole school leaderboard
 router.get('/school', requireAuth, asyncHandler(async (req, res) => {
-  const users = await findUsers({ role: 'STUDENT' });
+  const users = await findUsers({ role: Role.STUDENT });
 
   const leaderboardData = await Promise.all(
     users.map(async (user) => {
@@ -92,7 +92,7 @@ router.get('/school', requireAuth, asyncHandler(async (req, res) => {
 
 // Get leaderboard by most words read
 router.get('/words', requireAuth, asyncHandler(async (req, res) => {
-  const students = await findUsers({ role: 'STUDENT' });
+  const students = await findUsers({ role: Role.STUDENT });
 
   const leaderboardData = await Promise.all(
     students.map(async (student) => {
@@ -133,7 +133,7 @@ router.get('/words', requireAuth, asyncHandler(async (req, res) => {
 
 // Get leaderboard by highest average Lexile
 router.get('/lexile', requireAuth, asyncHandler(async (req, res) => {
-  const students = await findUsers({ role: 'STUDENT' });
+  const students = await findUsers({ role: Role.STUDENT });
 
   const leaderboardData = await Promise.all(
     students.map(async (student) => {

@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import { generateToken, requireAuth } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
+import { Role } from '../types/database';
 import { getUserByEmail, createUser, createPoint } from '../lib/db-helpers';
 
 const router = express.Router();
@@ -42,7 +43,7 @@ router.post('/signup', asyncHandler(async (req, res) => {
     class: studentClass.trim(),
     lexileLevel: lexileLevel ? parseInt(lexileLevel, 10) : null,
     passwordHash,
-    role: 'STUDENT',
+      role: Role.STUDENT,
   });
 
   await createPoint({

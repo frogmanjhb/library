@@ -1,11 +1,13 @@
 import express from 'express';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
+import { Role } from '../types/database';
 import {
   getStudentLexile,
   findStudentLexiles,
   upsertStudentLexile,
   findUsersWithLexiles,
+  findUsers,
   getUserById,
 } from '../lib/db-helpers';
 
@@ -74,7 +76,7 @@ router.get('/student/:userId', requireAuth, asyncHandler(async (req, res) => {
   const user = req.user!;
   
   // Students can only view their own lexile data
-  if (user.role === 'STUDENT' && user.id !== userId) {
+  if (user.role === Role.STUDENT && user.id !== userId) {
     throw new AppError('Access denied', 403);
   }
   
@@ -125,7 +127,7 @@ router.post('/student/:userId', requireAuth, requireLibrarian, asyncHandler(asyn
     throw new AppError('Student not found', 404);
   }
   
-  if (student.role !== 'STUDENT') {
+  if (student.role !== Role.STUDENT) {
     throw new AppError('User is not a student', 400);
   }
   
@@ -162,7 +164,7 @@ router.post('/bulk', requireAuth, requireLibrarian, asyncHandler(async (req, res
   
   // Get potential students to match against
   const students = await findUsers({
-    role: 'STUDENT',
+    role: Role.STUDENT,
     grade: grade ? parseInt(grade) : undefined,
     class: className as string | undefined,
   });
@@ -279,7 +281,7 @@ router.get('/class', requireAuth, asyncHandler(async (req, res) => {
   const { grade, className, year } = req.query;
   
   // Students cannot access class-wide data
-  if (user.role === 'STUDENT') {
+  if (user.role === Role.STUDENT) {
     throw new AppError('Access denied', 403);
   }
   
@@ -287,12 +289,12 @@ router.get('/class', requireAuth, asyncHandler(async (req, res) => {
   const targetYear = year ? parseInt(year as string) : currentYear;
   
   // Build student filter
-  const studentFilter: any = { role: 'STUDENT' };
+  const studentFilter: { role: Role; grade?: number; class?: string } = { role: Role.STUDENT };
   
   // Teachers can only see their own class
-  if (user.role === 'TEACHER') {
-    studentFilter.grade = user.grade;
-    studentFilter.class = user.class;
+  if (user.role === Role.TEACHER) {
+    studentFilter.grade = user.grade || undefined;
+    studentFilter.class = user.class || undefined;
   } else {
     // Librarians can filter
     if (grade) studentFilter.grade = parseInt(grade as string);

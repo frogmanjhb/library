@@ -1,6 +1,7 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import { getUserByEmail, createUser, updateUser, createPoint } from '../lib/db-helpers';
+import { Role } from '../types/database';
+import { getUserByEmail, getUserById, createUser, updateUser, createPoint } from '../lib/db-helpers';
 
 passport.use(
   new GoogleStrategy(
@@ -31,7 +32,7 @@ passport.use(
             email,
             name: profile.displayName || email.split('@')[0],
             googleId: profile.id,
-            role: 'STUDENT', // Default role, can be changed by librarian
+            role: Role.STUDENT, // Default role, can be changed by librarian
           });
 
           // Create initial points entry

@@ -1,9 +1,10 @@
 import express from 'express';
-import { BookStatus } from '../types/database';
+import { BookStatus, Role } from '../types/database';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import {
   findUsers,
+  findBooks,
   findBooksWithRelations,
   getBookWithRelations,
   createBook,
@@ -41,12 +42,12 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   let bookWhere: { userId?: string | string[]; status?: BookStatus } = {};
 
   // Apply role-based filtering
-  if (user.role === 'STUDENT') {
+  if (user.role === Role.STUDENT) {
     bookWhere.userId = user.id;
-  } else if (user.role === 'TEACHER') {
+  } else if (user.role === Role.TEACHER) {
     // Teachers see books from their grade/class
     const students = await findUsers({
-      role: 'STUDENT',
+      role: Role.STUDENT,
       grade: user.grade || undefined,
       class: user.class || undefined,
     });
@@ -54,7 +55,7 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
     if (!statusParam) {
       bookWhere.status = BookStatus.APPROVED;
     }
-  } else if (!statusParam && user.role !== 'LIBRARIAN') {
+  } else if (!statusParam && user.role !== Role.LIBRARIAN) {
     // Default to approved for non-student, non-librarian roles
     bookWhere.status = BookStatus.APPROVED;
   }
@@ -66,14 +67,14 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   }
   if (grade) {
     const students = await findUsers({
-      role: 'STUDENT',
+      role: Role.STUDENT,
       grade: parseInt(grade as string),
     });
     bookWhere.userId = students.map(s => s.id);
   }
   if (className) {
     const students = await findUsers({
-      role: 'STUDENT',
+      role: Role.STUDENT,
       class: className as string,
     });
     bookWhere.userId = students.map(s => s.id);
@@ -353,6 +354,10 @@ router.patch('/:id/verification', requireAuth, requireLibrarian, asyncHandler(as
 
   const updatedBookRaw = await updateBook(id, updateData);
   const updatedBook = await getBookWithRelations(id);
+
+  if (!updatedBook) {
+    throw new AppError('Book not found after update', 404);
+  }
 
   if (pointsAdjustment !== 0) {
     await upsertPoint({
