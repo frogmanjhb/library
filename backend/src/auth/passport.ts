@@ -1,6 +1,6 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import { prisma } from '../lib/prisma';
+import { getUserByEmail, createUser, updateUser, createPoint } from '../lib/db-helpers';
 
 passport.use(
   new GoogleStrategy(
@@ -23,34 +23,25 @@ passport.use(
         }
 
         // Find or create user
-        let user = await prisma.user.findUnique({
-          where: { email },
-        });
+        let user = await getUserByEmail(email);
 
         if (!user) {
           // Create new user
-          user = await prisma.user.create({
-            data: {
-              email,
-              name: profile.displayName || email.split('@')[0],
-              googleId: profile.id,
-              role: 'STUDENT', // Default role, can be changed by librarian
-            },
+          user = await createUser({
+            email,
+            name: profile.displayName || email.split('@')[0],
+            googleId: profile.id,
+            role: 'STUDENT', // Default role, can be changed by librarian
           });
 
           // Create initial points entry
-          await prisma.point.create({
-            data: {
-              userId: user.id,
-              totalPoints: 0,
-            },
+          await createPoint({
+            userId: user.id,
+            totalPoints: 0,
           });
         } else if (!user.googleId) {
           // Update existing user with Google ID
-          user = await prisma.user.update({
-            where: { id: user.id },
-            data: { googleId: profile.id },
-          });
+          user = await updateUser(user.id, { googleId: profile.id });
         }
 
         return done(null, user);
@@ -70,9 +61,7 @@ passport.serializeUser((user: any, done) => {
 // Deserialize user from session
 passport.deserializeUser(async (id: string, done) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id },
-    });
+    const user = await getUserById(id);
     done(null, user);
   } catch (error) {
     done(error, null);

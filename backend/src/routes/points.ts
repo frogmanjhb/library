@@ -1,7 +1,7 @@
 import express from 'express';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { prisma } from '../lib/prisma';
+import { getPointByUserId, updatePoint } from '../lib/db-helpers';
 
 const router = express.Router();
 
@@ -9,9 +9,7 @@ const router = express.Router();
 router.get('/:userId', requireAuth, asyncHandler(async (req, res) => {
   const { userId } = req.params;
 
-  const points = await prisma.point.findUnique({
-    where: { userId },
-  });
+  const points = await getPointByUserId(userId);
 
   if (!points) {
     throw new AppError('Points not found', 404);
@@ -28,12 +26,7 @@ router.post('/adjust', requireLibrarian, asyncHandler(async (req, res) => {
     throw new AppError('User ID and amount are required', 400);
   }
 
-  const points = await prisma.point.update({
-    where: { userId },
-    data: {
-      totalPoints: { increment: parseInt(amount) },
-    },
-  });
+  const points = await updatePoint(userId, { increment: parseInt(amount) });
 
   // Emit socket event
   const io = req.app.get('io');

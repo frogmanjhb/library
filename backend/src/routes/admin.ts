@@ -1,7 +1,17 @@
 import express from 'express';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { prisma } from '../lib/prisma';
+import {
+  findUsers,
+  getUserByEmail,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  deleteUsers,
+  updateUsers,
+  createPoint,
+} from '../lib/db-helpers';
 
 const router = express.Router();
 
@@ -30,19 +40,7 @@ router.get('/students', asyncHandler(async (req, res) => {
     where.class = className as string;
   }
 
-  const students = await prisma.user.findMany({
-    where,
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      grade: true,
-      class: true,
-      lexileLevel: true,
-      createdAt: true,
-    },
-    orderBy: [{ grade: 'asc' }, { class: 'asc' }, { name: 'asc' }],
-  });
+  const students = await findUsers(where);
 
   res.json(students);
 }));
@@ -86,25 +84,21 @@ router.post('/students', asyncHandler(async (req, res) => {
       continue;
     }
 
-    const existing = await prisma.user.findUnique({ where: { email: s.email } });
+    const existing = await getUserByEmail(s.email);
     if (existing) {
       errors.push({ email: s.email, message: 'Email already exists' });
       continue;
     }
 
-    const user = await prisma.user.create({
-      data: {
-        email: s.email,
-        name: s.name,
-        role: 'STUDENT',
-        grade: s.grade ?? null,
-        class: s.class ?? null,
-      },
+    const user = await createUser({
+      email: s.email,
+      name: s.name,
+      role: 'STUDENT',
+      grade: s.grade ?? null,
+      class: s.class ?? null,
     });
 
-    await prisma.point.create({
-      data: { userId: user.id, totalPoints: 0 },
-    });
+    await createPoint({ userId: user.id, totalPoints: 0 });
 
     created.push({
       id: user.id,
@@ -126,34 +120,32 @@ router.put('/students/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { name, email, grade, class: className } = req.body;
 
-  const student = await prisma.user.findUnique({
-    where: { id },
-  });
+  const student = await getUserById(id);
 
   if (!student || student.role !== 'STUDENT') {
     throw new AppError('Student not found', 404);
   }
 
-  const updateData: Record<string, unknown> = {};
+  const updateData: Partial<{
+    name: string;
+    email: string;
+    grade: number | null;
+    class: string | null;
+  }> = {};
   if (name !== undefined) updateData.name = String(name).trim();
   if (email !== undefined) {
     const normalized = String(email).trim().toLowerCase();
     if (!normalized.endsWith('@stpeters.co.za')) {
       throw new AppError('Only @stpeters.co.za emails allowed', 400);
     }
-    const existing = await prisma.user.findFirst({
-      where: { email: normalized, NOT: { id } },
-    });
-    if (existing) throw new AppError('Email already in use', 400);
+    const existing = await getUserByEmail(normalized);
+    if (existing && existing.id !== id) throw new AppError('Email already in use', 400);
     updateData.email = normalized;
   }
   if (grade !== undefined) updateData.grade = grade === '' || grade === null ? null : parseInt(grade, 10);
   if (className !== undefined) updateData.class = className === '' || className === null ? null : String(className).trim();
 
-  const updated = await prisma.user.update({
-    where: { id },
-    data: updateData,
-  });
+  const updated = await updateUser(id, updateData);
 
   res.json(updated);
 }));
@@ -174,13 +166,7 @@ router.patch('/students/bulk', asyncHandler(async (req, res) => {
     throw new AppError('Provide grade and/or class to update', 400);
   }
 
-  const { count } = await prisma.user.updateMany({
-    where: {
-      id: { in: ids },
-      role: 'STUDENT',
-    },
-    data: updateData,
-  });
+  const count = await updateUsers(ids, updateData);
 
   res.json({ updated: count });
 }));
@@ -193,12 +179,7 @@ router.delete('/students/bulk', asyncHandler(async (req, res) => {
     throw new AppError('ids array is required and must not be empty', 400);
   }
 
-  const { count } = await prisma.user.deleteMany({
-    where: {
-      id: { in: ids },
-      role: 'STUDENT',
-    },
-  });
+  const count = await deleteUsers(ids);
 
   res.json({ deleted: count });
 }));
@@ -207,15 +188,13 @@ router.delete('/students/bulk', asyncHandler(async (req, res) => {
 router.delete('/students/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const student = await prisma.user.findUnique({
-    where: { id },
-  });
+  const student = await getUserById(id);
 
   if (!student || student.role !== 'STUDENT') {
     throw new AppError('Student not found', 404);
   }
 
-  await prisma.user.delete({ where: { id } });
+  await deleteUser(id);
 
   res.json({ message: 'Student deleted successfully' });
 }));

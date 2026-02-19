@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { Role } from '@prisma/client';
+import { Role } from '../types/database';
 import { AppError } from './errorHandler';
-import { prisma } from '../lib/prisma';
+import { getUserById } from '../lib/db-helpers';
 
 interface JWTPayload {
   userId: string;
@@ -48,9 +48,7 @@ export const requireAuth = async (
     const decoded = verifyToken(token);
 
     // Fetch user from database
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-    });
+    const user = await getUserById(decoded.userId);
 
     if (!user) {
       throw new AppError('User not found', 404);

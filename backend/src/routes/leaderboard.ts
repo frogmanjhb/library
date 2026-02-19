@@ -1,8 +1,13 @@
 import express from 'express';
-import { BookStatus } from '@prisma/client';
+import { BookStatus } from '../types/database';
 import { requireAuth } from '../middleware/auth';
 import { asyncHandler } from '../middleware/errorHandler';
-import { prisma } from '../lib/prisma';
+import {
+  findUsers,
+  getPointByUserId,
+  findBooks,
+  aggregateBooks,
+} from '../lib/db-helpers';
 
 const router = express.Router();
 
@@ -14,35 +19,37 @@ router.get('/by-grade', requireAuth, asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'Grade parameter is required' });
   }
 
-  const leaderboard = await prisma.user.findMany({
-    where: {
-      role: 'STUDENT',
-      grade: parseInt(grade as string),
-    },
-    include: {
-      points: true,
-      books: {
-        where: { status: BookStatus.APPROVED },
-        select: { id: true },
-      },
-    },
-    orderBy: {
-      points: {
-        totalPoints: 'desc',
-      },
-    },
-    take: 50,
+  const users = await findUsers({
+    role: 'STUDENT',
+    grade: parseInt(grade as string),
   });
 
-  const formatted = leaderboard.map((user, index) => ({
+  const leaderboardData = await Promise.all(
+    users.map(async (user) => {
+      const points = await getPointByUserId(user.id);
+      const books = await findBooks({
+        userId: user.id,
+        status: BookStatus.APPROVED,
+      });
+      return {
+        user,
+        points,
+        booksRead: books.length,
+      };
+    })
+  );
+
+  leaderboardData.sort((a, b) => (b.points?.totalPoints || 0) - (a.points?.totalPoints || 0));
+
+  const formatted = leaderboardData.slice(0, 50).map((item, index) => ({
     rank: index + 1,
-    userId: user.id,
-    name: user.name,
-    email: user.email,
-    grade: user.grade,
-    class: user.class,
-    totalPoints: user.points?.totalPoints || 0,
-    booksRead: user.books.length,
+    userId: item.user.id,
+    name: item.user.name,
+    email: item.user.email,
+    grade: item.user.grade,
+    class: item.user.class,
+    totalPoints: item.points?.totalPoints || 0,
+    booksRead: item.booksRead,
   }));
 
   res.json(formatted);
@@ -50,34 +57,34 @@ router.get('/by-grade', requireAuth, asyncHandler(async (req, res) => {
 
 // Get whole school leaderboard
 router.get('/school', requireAuth, asyncHandler(async (req, res) => {
-  const leaderboard = await prisma.user.findMany({
-    where: {
-      role: 'STUDENT',
-    },
-    include: {
-      points: true,
-      books: {
-        where: { status: BookStatus.APPROVED },
-        select: { id: true },
-      },
-    },
-    orderBy: {
-      points: {
-        totalPoints: 'desc',
-      },
-    },
-    take: 50,
-  });
+  const users = await findUsers({ role: 'STUDENT' });
 
-  const formatted = leaderboard.map((user, index) => ({
+  const leaderboardData = await Promise.all(
+    users.map(async (user) => {
+      const points = await getPointByUserId(user.id);
+      const books = await findBooks({
+        userId: user.id,
+        status: BookStatus.APPROVED,
+      });
+      return {
+        user,
+        points,
+        booksRead: books.length,
+      };
+    })
+  );
+
+  leaderboardData.sort((a, b) => (b.points?.totalPoints || 0) - (a.points?.totalPoints || 0));
+
+  const formatted = leaderboardData.slice(0, 50).map((item, index) => ({
     rank: index + 1,
-    userId: user.id,
-    name: user.name,
-    email: user.email,
-    grade: user.grade,
-    class: user.class,
-    totalPoints: user.points?.totalPoints || 0,
-    booksRead: user.books.length,
+    userId: item.user.id,
+    name: item.user.name,
+    email: item.user.email,
+    grade: item.user.grade,
+    class: item.user.class,
+    totalPoints: item.points?.totalPoints || 0,
+    booksRead: item.booksRead,
   }));
 
   res.json(formatted);
@@ -85,28 +92,18 @@ router.get('/school', requireAuth, asyncHandler(async (req, res) => {
 
 // Get leaderboard by most words read
 router.get('/words', requireAuth, asyncHandler(async (req, res) => {
-  const students = await prisma.user.findMany({
-    where: { role: 'STUDENT' },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      grade: true,
-      class: true,
-    },
-  });
+  const students = await findUsers({ role: 'STUDENT' });
 
   const leaderboardData = await Promise.all(
     students.map(async (student) => {
-      const result = await prisma.book.aggregate({
-        where: {
+      const result = await aggregateBooks(
+        {
           userId: student.id,
           status: BookStatus.APPROVED,
           wordCount: { not: null },
         },
-        _sum: { wordCount: true },
-        _count: true,
-      });
+        { _sum: { wordCount: true }, _count: true }
+      );
 
       return {
         userId: student.id,
@@ -114,8 +111,8 @@ router.get('/words', requireAuth, asyncHandler(async (req, res) => {
         email: student.email,
         grade: student.grade,
         class: student.class,
-        totalWords: result._sum.wordCount || 0,
-        booksRead: result._count,
+        totalWords: result._sum?.wordCount || 0,
+        booksRead: result._count || 0,
       };
     })
   );
@@ -136,28 +133,18 @@ router.get('/words', requireAuth, asyncHandler(async (req, res) => {
 
 // Get leaderboard by highest average Lexile
 router.get('/lexile', requireAuth, asyncHandler(async (req, res) => {
-  const students = await prisma.user.findMany({
-    where: { role: 'STUDENT' },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      grade: true,
-      class: true,
-    },
-  });
+  const students = await findUsers({ role: 'STUDENT' });
 
   const leaderboardData = await Promise.all(
     students.map(async (student) => {
-      const result = await prisma.book.aggregate({
-        where: {
+      const result = await aggregateBooks(
+        {
           userId: student.id,
           status: BookStatus.APPROVED,
           lexileLevel: { not: null },
         },
-        _avg: { lexileLevel: true },
-        _count: true,
-      });
+        { _avg: { lexileLevel: true }, _count: true }
+      );
 
       return {
         userId: student.id,
@@ -165,8 +152,8 @@ router.get('/lexile', requireAuth, asyncHandler(async (req, res) => {
         email: student.email,
         grade: student.grade,
         class: student.class,
-        avgLexile: Math.round(result._avg.lexileLevel || 0),
-        booksRead: result._count,
+        avgLexile: Math.round(result._avg?.lexileLevel || 0),
+        booksRead: result._count || 0,
       };
     })
   );

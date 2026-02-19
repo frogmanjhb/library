@@ -8,7 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { PrismaClient } from '@prisma/client';
+import { query, closePool } from '../src/lib/db';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -30,20 +30,14 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const prisma = new PrismaClient({
-  datasources: { db: { url: databaseUrl } },
-});
-
 async function main() {
   console.log('🧹 Clearing all reading logs and book-related data...');
 
-  const deletedBooks = await prisma.book.deleteMany();
-  console.log(`   Deleted ${deletedBooks.count} books (and related comments)`);
+  const deletedBooks = await query('DELETE FROM "Book"');
+  console.log(`   Deleted ${deletedBooks.rowCount || 0} books (and related comments)`);
 
-  const resetPoints = await prisma.point.updateMany({
-    data: { totalPoints: 0 },
-  });
-  console.log(`   Reset ${resetPoints.count} user point records to 0`);
+  const resetPoints = await query('UPDATE "Point" SET "totalPoints" = 0');
+  console.log(`   Reset ${resetPoints.rowCount || 0} user point records to 0`);
 
   console.log('✅ All reading logs and book-related data cleared.');
 }
@@ -54,5 +48,5 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect();
+    await closePool();
   });

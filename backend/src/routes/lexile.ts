@@ -1,7 +1,13 @@
 import express from 'express';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { prisma } from '../lib/prisma';
+import {
+  getStudentLexile,
+  findStudentLexiles,
+  upsertStudentLexile,
+  findUsersWithLexiles,
+  getUserById,
+} from '../lib/db-helpers';
 
 const router = express.Router();
 
@@ -42,21 +48,18 @@ export async function getStudentCurrentLexile(userId: string): Promise<number | 
   const { term, year } = getCurrentTermAndYear();
   
   // First try to get current term's lexile
-  let lexileRecord = await prisma.studentLexile.findUnique({
-    where: {
-      userId_term_year: { userId, term, year }
-    }
-  });
+  let lexileRecord = await getStudentLexile(userId, term, year);
   
   // If not found, get the most recent lexile record
   if (!lexileRecord) {
-    lexileRecord = await prisma.studentLexile.findFirst({
-      where: { userId },
-      orderBy: [
-        { year: 'desc' },
-        { term: 'desc' }
+    const records = await findStudentLexiles(
+      { userId },
+      [
+        { field: 'year', order: 'desc' },
+        { field: 'term', order: 'desc' }
       ]
-    });
+    );
+    lexileRecord = records[0] || null;
   }
   
   return lexileRecord?.lexile ?? null;
@@ -75,23 +78,13 @@ router.get('/student/:userId', requireAuth, asyncHandler(async (req, res) => {
     throw new AppError('Access denied', 403);
   }
   
-  const lexileRecords = await prisma.studentLexile.findMany({
-    where: { userId },
-    orderBy: [
-      { year: 'desc' },
-      { term: 'desc' }
-    ],
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          grade: true,
-          class: true,
-        }
-      }
-    }
-  });
+  const lexileRecords = await findStudentLexiles(
+    { userId },
+    [
+      { field: 'year', order: 'desc' },
+      { field: 'term', order: 'desc' }
+    ]
+  );
   
   // Also include the current term info
   const { term: currentTerm, year: currentYear } = getCurrentTermAndYear();
@@ -126,9 +119,7 @@ router.post('/student/:userId', requireAuth, requireLibrarian, asyncHandler(asyn
   }
   
   // Verify the user exists and is a student
-  const student = await prisma.user.findUnique({
-    where: { id: userId }
-  });
+  const student = await getUserById(userId);
   
   if (!student) {
     throw new AppError('Student not found', 404);
@@ -139,29 +130,11 @@ router.post('/student/:userId', requireAuth, requireLibrarian, asyncHandler(asyn
   }
   
   // Upsert the lexile record
-  const lexileRecord = await prisma.studentLexile.upsert({
-    where: {
-      userId_term_year: { userId, term, year }
-    },
-    update: {
-      lexile: parseInt(lexile)
-    },
-    create: {
-      userId,
-      term: parseInt(term),
-      year: parseInt(year),
-      lexile: parseInt(lexile)
-    },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          grade: true,
-          class: true,
-        }
-      }
-    }
+  const lexileRecord = await upsertStudentLexile({
+    userId,
+    term: parseInt(term),
+    year: parseInt(year),
+    lexile: parseInt(lexile)
   });
   
   res.json(lexileRecord);
@@ -188,18 +161,10 @@ router.post('/bulk', requireAuth, requireLibrarian, asyncHandler(async (req, res
   const results: { line: number; name: string; status: string; lexile?: number; error?: string }[] = [];
   
   // Get potential students to match against
-  const whereClause: any = { role: 'STUDENT' };
-  if (grade) whereClause.grade = parseInt(grade);
-  if (className) whereClause.class = className;
-  
-  const students = await prisma.user.findMany({
-    where: whereClause,
-    select: {
-      id: true,
-      name: true,
-      grade: true,
-      class: true,
-    }
+  const students = await findUsers({
+    role: 'STUDENT',
+    grade: grade ? parseInt(grade) : undefined,
+    class: className as string | undefined,
   });
   
   // Process each line
@@ -269,23 +234,11 @@ router.post('/bulk', requireAuth, requireLibrarian, asyncHandler(async (req, res
     const student = matchingStudents[0];
     
     try {
-      await prisma.studentLexile.upsert({
-        where: {
-          userId_term_year: {
-            userId: student.id,
-            term: parseInt(term),
-            year: parseInt(year)
-          }
-        },
-        update: {
-          lexile: lexileValue
-        },
-        create: {
-          userId: student.id,
-          term: parseInt(term),
-          year: parseInt(year),
-          lexile: lexileValue
-        }
+      await upsertStudentLexile({
+        userId: student.id,
+        term: parseInt(term),
+        year: parseInt(year),
+        lexile: lexileValue
       });
       
       results.push({
@@ -347,24 +300,10 @@ router.get('/class', requireAuth, asyncHandler(async (req, res) => {
   }
   
   // Get all students matching the filter with their lexile records
-  const students = await prisma.user.findMany({
-    where: studentFilter,
-    select: {
-      id: true,
-      name: true,
-      grade: true,
-      class: true,
-      studentLexiles: {
-        where: { year: targetYear },
-        orderBy: { term: 'asc' }
-      }
-    },
-    orderBy: [
-      { grade: 'asc' },
-      { class: 'asc' },
-      { name: 'asc' }
-    ]
-  });
+  const students = await findUsersWithLexiles(
+    studentFilter,
+    { year: targetYear }
+  );
   
   // Transform data for easier frontend consumption
   const studentsWithLexiles = students.map(student => {

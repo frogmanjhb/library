@@ -1,26 +1,18 @@
 import express from 'express';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { prisma } from '../lib/prisma';
+import {
+  findAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+} from '../lib/db-helpers';
 
 const router = express.Router();
 
 // Get recent announcements
 router.get('/', requireAuth, asyncHandler(async (req, res) => {
-  const announcements = await prisma.announcement.findMany({
-    include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 10,
-  });
-
+  const announcements = await findAnnouncements(10);
   res.json(announcements);
 }));
 
@@ -33,20 +25,9 @@ router.post('/', requireAuth, requireLibrarian, asyncHandler(async (req, res) =>
     throw new AppError('Message is required', 400);
   }
 
-  const announcement = await prisma.announcement.create({
-    data: {
-      message,
-      createdBy: user.id,
-    },
-    include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
+  const announcement = await createAnnouncement({
+    message,
+    createdBy: user.id,
   });
 
   // Emit socket event
@@ -65,19 +46,7 @@ router.put('/:id', requireAuth, requireLibrarian, asyncHandler(async (req, res) 
     throw new AppError('Message is required', 400);
   }
 
-  const announcement = await prisma.announcement.update({
-    where: { id },
-    data: { message },
-    include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
-  });
+  const announcement = await updateAnnouncement(id, { message });
 
   res.json(announcement);
 }));
@@ -86,7 +55,7 @@ router.put('/:id', requireAuth, requireLibrarian, asyncHandler(async (req, res) 
 router.delete('/:id', requireAuth, requireLibrarian, asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  await prisma.announcement.delete({ where: { id } });
+  await deleteAnnouncement(id);
 
   res.json({ message: 'Announcement deleted successfully' });
 }));

@@ -1,7 +1,14 @@
 import express from 'express';
 import { requireAuth, requireTeacher } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { prisma } from '../lib/prisma';
+import {
+  findCommentsByBookId,
+  getCommentById,
+  createComment,
+  updateComment,
+  deleteComment,
+  getBookById,
+} from '../lib/db-helpers';
 
 const router = express.Router();
 
@@ -9,20 +16,7 @@ const router = express.Router();
 router.get('/:bookId', requireAuth, asyncHandler(async (req, res) => {
   const { bookId } = req.params;
 
-  const comments = await prisma.comment.findMany({
-    where: { bookId },
-    include: {
-      teacher: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
+  const comments = await findCommentsByBookId(bookId);
   res.json(comments);
 }));
 
@@ -36,26 +30,15 @@ router.post('/', requireTeacher, asyncHandler(async (req, res) => {
   }
 
   // Check if book exists
-  const book = await prisma.book.findUnique({ where: { id: bookId } });
+  const book = await getBookById(bookId);
   if (!book) {
     throw new AppError('Book not found', 404);
   }
 
-  const comment = await prisma.comment.create({
-    data: {
-      content,
-      bookId,
-      teacherId: user.id,
-    },
-    include: {
-      teacher: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
+  const comment = await createComment({
+    content,
+    bookId,
+    teacherId: user.id,
   });
 
   res.status(201).json(comment);
@@ -65,18 +48,13 @@ router.post('/', requireTeacher, asyncHandler(async (req, res) => {
 router.put('/:id/react', requireAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const comment = await prisma.comment.findUnique({ where: { id } });
+  const comment = await getCommentById(id);
 
   if (!comment) {
     throw new AppError('Comment not found', 404);
   }
 
-  const updated = await prisma.comment.update({
-    where: { id },
-    data: {
-      reactions: { increment: 1 },
-    },
-  });
+  const updated = await updateComment(id, { reactions: 1 });
 
   res.json(updated);
 }));
@@ -86,7 +64,7 @@ router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const user = req.user!;
 
-  const comment = await prisma.comment.findUnique({ where: { id } });
+  const comment = await getCommentById(id);
 
   if (!comment) {
     throw new AppError('Comment not found', 404);
@@ -97,7 +75,7 @@ router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
     throw new AppError('Access denied', 403);
   }
 
-  await prisma.comment.delete({ where: { id } });
+  await deleteComment(id);
 
   res.json({ message: 'Comment deleted successfully' });
 }));

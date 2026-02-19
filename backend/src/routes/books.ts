@@ -1,8 +1,21 @@
 import express from 'express';
-import { BookStatus } from '@prisma/client';
+import { BookStatus } from '../types/database';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { prisma } from '../lib/prisma';
+import {
+  findUsers,
+  findBooksWithRelations,
+  getBookWithRelations,
+  createBook,
+  updateBook,
+  updateBooks,
+  deleteBook,
+  deleteBooks,
+  getBookById,
+  getUserById,
+  upsertPoint,
+  updatePoints,
+} from '../lib/db-helpers';
 import { searchBookInfo } from '../services/bookSearch';
 import { getStudentCurrentLexile } from './lexile';
 
@@ -24,80 +37,56 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
     where.status = normalizedStatus as BookStatus;
   }
 
+  // Build where clause for books
+  let bookWhere: { userId?: string | string[]; status?: BookStatus } = {};
+
   // Apply role-based filtering
   if (user.role === 'STUDENT') {
-    where.userId = user.id;
+    bookWhere.userId = user.id;
   } else if (user.role === 'TEACHER') {
     // Teachers see books from their grade/class
-    const students = await prisma.user.findMany({
-      where: {
-        role: 'STUDENT',
-        grade: user.grade,
-        class: user.class,
-      },
-      select: { id: true },
+    const students = await findUsers({
+      role: 'STUDENT',
+      grade: user.grade || undefined,
+      class: user.class || undefined,
     });
-    where.userId = { in: students.map(s => s.id) };
+    bookWhere.userId = students.map(s => s.id);
     if (!statusParam) {
-      where.status = BookStatus.APPROVED;
+      bookWhere.status = BookStatus.APPROVED;
     }
   } else if (!statusParam && user.role !== 'LIBRARIAN') {
     // Default to approved for non-student, non-librarian roles
-    where.status = BookStatus.APPROVED;
+    bookWhere.status = BookStatus.APPROVED;
   }
   // Librarians see all books unless a status filter is supplied
 
   // Apply additional filters
-  if (userId) where.userId = userId as string;
+  if (userId) {
+    bookWhere.userId = userId as string;
+  }
   if (grade) {
-    const students = await prisma.user.findMany({
-      where: { role: 'STUDENT', grade: parseInt(grade as string) },
-      select: { id: true },
+    const students = await findUsers({
+      role: 'STUDENT',
+      grade: parseInt(grade as string),
     });
-    where.userId = { in: students.map(s => s.id) };
+    bookWhere.userId = students.map(s => s.id);
   }
   if (className) {
-    const students = await prisma.user.findMany({
-      where: { role: 'STUDENT', class: className as string },
-      select: { id: true },
+    const students = await findUsers({
+      role: 'STUDENT',
+      class: className as string,
     });
-    where.userId = { in: students.map(s => s.id) };
+    bookWhere.userId = students.map(s => s.id);
   }
 
-  const books = await prisma.book.findMany({
-    where,
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          grade: true,
-          class: true,
-        },
-      },
-      comments: {
-        include: {
-          teacher: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-        },
-      },
-      verifiedBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
-    orderBy: {
-      [sortBy as string]: order as 'asc' | 'desc',
-    },
-  });
+  if (statusParam) {
+    bookWhere.status = statusParam as BookStatus;
+  }
+
+  const books = await findBooksWithRelations(
+    bookWhere,
+    { field: sortBy as string, order: order as 'asc' | 'desc' }
+  );
 
   res.json(books);
 }));
@@ -107,38 +96,7 @@ router.get('/:id', requireAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const user = req.user!;
 
-  const book = await prisma.book.findUnique({
-    where: { id },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          grade: true,
-          class: true,
-        },
-      },
-      comments: {
-        include: {
-          teacher: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      },
-      verifiedBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
-  });
+  const book = await getBookWithRelations(id);
 
   if (!book) {
     throw new AppError('Book not found', 404);
@@ -168,7 +126,7 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
 
   let bookUserId: string;
   if (user.role === 'LIBRARIAN' && targetUserId) {
-    const target = await prisma.user.findUnique({ where: { id: targetUserId } });
+    const target = await getUserById(targetUserId);
     if (!target || target.role !== 'STUDENT') {
       throw new AppError('Invalid or non-student userId', 400);
     }
@@ -180,20 +138,18 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
   }
 
   // Create book immediately with user-provided data
-  const book = await prisma.book.create({
-    data: {
-      title,
-      author,
-      rating,
-      comment,
-      lexileLevel: lexileLevel ? parseInt(lexileLevel) : null,
-      wordCount: wordCount ? parseInt(wordCount) : null,
-      ageRange,
-      genres: genres || [],
-      coverUrl,
-      userId: bookUserId,
-      status: BookStatus.PENDING,
-    },
+  const book = await createBook({
+    title,
+    author,
+    rating,
+    comment,
+    lexileLevel: lexileLevel ? parseInt(lexileLevel) : null,
+    wordCount: wordCount ? parseInt(wordCount) : null,
+    ageRange,
+    genres: genres || [],
+    coverUrl,
+    userId: bookUserId,
+    status: BookStatus.PENDING,
   });
 
   // Emit socket event for real-time updates
@@ -218,18 +174,12 @@ router.delete('/bulk', requireAuth, requireLibrarian, asyncHandler(async (req, r
     throw new AppError('ids array is required and must not be empty', 400);
   }
 
-  const books = await prisma.book.findMany({
-    where: { id: { in: ids } },
-    select: { id: true, userId: true, pointsAwarded: true, pointsAwardedValue: true },
-  });
+  const books = await findBooks({ id: ids });
 
   for (const book of books) {
-    await prisma.book.delete({ where: { id: book.id } });
+    await deleteBook(book.id);
     if (book.pointsAwarded && book.pointsAwardedValue && book.pointsAwardedValue > 0) {
-      await prisma.point.updateMany({
-        where: { userId: book.userId },
-        data: { totalPoints: { decrement: book.pointsAwardedValue } },
-      });
+      await updatePoints(book.userId, { decrement: book.pointsAwardedValue });
     }
   }
 
@@ -268,10 +218,7 @@ router.patch('/bulk', requireAuth, requireLibrarian, asyncHandler(async (req, re
     throw new AppError('Provide at least one field to update (status, lexileLevel, wordCount, ageRange, genres)', 400);
   }
 
-  const { count } = await prisma.book.updateMany({
-    where: { id: { in: ids } },
-    data: updateData,
-  });
+  const count = await updateBooks(ids, updateData);
 
   const io = req.app.get('io');
   io.emit('leaderboard:update');
@@ -284,7 +231,7 @@ router.put('/:id', requireAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const user = req.user!;
 
-  const book = await prisma.book.findUnique({ where: { id } });
+  const book = await getBookById(id);
 
   if (!book) {
     throw new AppError('Book not found', 404);
@@ -313,19 +260,16 @@ router.put('/:id', requireAuth, asyncHandler(async (req, res) => {
     return Number.isFinite(numeric) ? numeric : book.wordCount;
   })();
 
-  const updatedBook = await prisma.book.update({
-    where: { id },
-    data: {
-      title: title ?? book.title,
-      author: author ?? book.author,
-      rating: rating ?? book.rating,
-      comment: comment ?? book.comment,
-      lexileLevel: parsedLexile,
-      wordCount: parsedWordCount,
-      ageRange: ageRange ?? book.ageRange,
-      genres: genres ?? book.genres,
-      coverUrl: coverUrl ?? book.coverUrl,
-    },
+  const updatedBook = await updateBook(id, {
+    title: title ?? book.title,
+    author: author ?? book.author,
+    rating: rating ?? book.rating,
+    comment: comment ?? book.comment,
+    lexileLevel: parsedLexile,
+    wordCount: parsedWordCount,
+    ageRange: ageRange ?? book.ageRange,
+    genres: genres ?? book.genres,
+    coverUrl: coverUrl ?? book.coverUrl,
   });
 
   res.json(updatedBook);
@@ -345,9 +289,7 @@ router.patch('/:id/verification', requireAuth, requireLibrarian, asyncHandler(as
     throw new AppError('Status must be APPROVED or REJECTED', 400);
   }
 
-  const existingBook = await prisma.book.findUnique({
-    where: { id },
-  });
+  const existingBook = await getBookById(id);
 
   if (!existingBook) {
     throw new AppError('Book not found', 404);
@@ -409,60 +351,14 @@ router.patch('/:id/verification', requireAuth, requireLibrarian, asyncHandler(as
     updateData.pointsAwardedValue = 0;
   }
 
-  const updatedBook = await prisma.book.update({
-    where: { id },
-    data: updateData,
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          grade: true,
-          class: true,
-        },
-      },
-      comments: {
-        include: {
-          teacher: {
-            select: {
-              name: true,
-              email: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      },
-      verifiedBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      },
-    },
-  });
+  const updatedBookRaw = await updateBook(id, updateData);
+  const updatedBook = await getBookWithRelations(id);
 
   if (pointsAdjustment !== 0) {
-    if (pointsAdjustment > 0) {
-      await prisma.point.upsert({
-        where: { userId: updatedBook.userId },
-        update: {
-          totalPoints: { increment: pointsAdjustment },
-        },
-        create: {
-          userId: updatedBook.userId,
-          totalPoints: pointsAdjustment,
-        },
-      });
-    } else {
-      await prisma.point.update({
-        where: { userId: updatedBook.userId },
-        data: {
-          totalPoints: { increment: pointsAdjustment },
-        },
-      });
-    }
+    await upsertPoint({
+      userId: updatedBookRaw.userId,
+      increment: pointsAdjustment,
+    });
   }
 
   const io = req.app.get('io');
@@ -477,7 +373,7 @@ router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const user = req.user!;
 
-  const book = await prisma.book.findUnique({ where: { id } });
+  const book = await getBookById(id);
 
   if (!book) {
     throw new AppError('Book not found', 404);
@@ -488,16 +384,11 @@ router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
     throw new AppError('Access denied', 403);
   }
 
-  await prisma.book.delete({ where: { id } });
+  await deleteBook(id);
 
   // Deduct points if they were previously awarded
   if (book.pointsAwarded && book.pointsAwardedValue && book.pointsAwardedValue > 0) {
-    await prisma.point.updateMany({
-      where: { userId: book.userId },
-      data: {
-        totalPoints: { decrement: book.pointsAwardedValue },
-      },
-    });
+    await updatePoints(book.userId, { decrement: book.pointsAwardedValue });
   }
 
   res.json({ message: 'Book deleted successfully' });
@@ -514,16 +405,13 @@ async function searchAndUpdateBook(bookId: string, title: string, author: string
     const searchResults = await searchBookInfo(title, author);
 
     // Get current book to merge genres
-    const currentBook = await prisma.book.findUnique({
-      where: { id: bookId },
-      select: {
-        wordCount: true,
-        genres: true,
-      },
-    });
+    const currentBook = await getBookById(bookId);
 
     // Only update if we found new information
-    const updateData: any = {};
+    const updateData: Partial<{
+      wordCount: number | null;
+      genres: string[];
+    }> = {};
 
     // Only update wordCount if we don't already have one or if search found one
     if (searchResults.wordCount !== null && !currentBook?.wordCount) {
@@ -541,11 +429,8 @@ async function searchAndUpdateBook(bookId: string, title: string, author: string
     }
 
     // Only update if we have new data to add
-    if (Object.keys(updateData).length > 0) {
-      await prisma.book.update({
-        where: { id: bookId },
-        data: updateData,
-      });
+    if (Object.keys(updateData).length > 0 && currentBook) {
+      await updateBook(bookId, updateData);
       console.log(`Updated book ${bookId} with search results:`, updateData);
     } else {
       console.log(`No additional information found for book ${bookId}`);

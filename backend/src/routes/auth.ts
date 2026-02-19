@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import { generateToken, requireAuth } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { prisma } from '../lib/prisma';
+import { getUserByEmail, createUser, createPoint } from '../lib/db-helpers';
 
 const router = express.Router();
 
@@ -27,9 +27,7 @@ router.post('/signup', asyncHandler(async (req, res) => {
     throw new AppError('Only @stpeters.co.za email addresses are allowed', 400);
   }
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-  });
+  const existingUser = await getUserByEmail(normalizedEmail);
 
   if (existingUser) {
     throw new AppError('An account with this email already exists', 400);
@@ -37,23 +35,19 @@ router.post('/signup', asyncHandler(async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const user = await prisma.user.create({
-    data: {
-      email: normalizedEmail,
-      name: name.trim(),
-      surname: surname.trim(),
-      class: studentClass.trim(),
-      lexileLevel: lexileLevel ? parseInt(lexileLevel, 10) : null,
-      passwordHash,
-      role: 'STUDENT',
-    },
+  const user = await createUser({
+    email: normalizedEmail,
+    name: name.trim(),
+    surname: surname.trim(),
+    class: studentClass.trim(),
+    lexileLevel: lexileLevel ? parseInt(lexileLevel, 10) : null,
+    passwordHash,
+    role: 'STUDENT',
   });
 
-  await prisma.point.create({
-    data: {
-      userId: user.id,
-      totalPoints: 0,
-    },
+  await createPoint({
+    userId: user.id,
+    totalPoints: 0,
   });
 
   const token = generateToken(user.id, user.email, user.role);
@@ -82,9 +76,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const user = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-  });
+  const user = await getUserByEmail(normalizedEmail);
 
   if (!user) {
     throw new AppError('User not found. Please sign up first or use a valid @stpeters.co.za email.', 404);
