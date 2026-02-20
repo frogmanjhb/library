@@ -51,6 +51,11 @@ export const Home = () => {
           <CardDescription className="text-base">
             Sign in with your school account. New to Pageforge? Sign up to get started.
           </CardDescription>
+          <p className="text-center">
+            <Link to="/info" className="text-sm text-muted-foreground hover:underline">
+              Learn more about features and overview →
+            </Link>
+          </p>
         </CardHeader>
         <CardContent className="space-y-3 pt-2">
           <Button

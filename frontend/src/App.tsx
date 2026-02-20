@@ -5,6 +5,7 @@ import { Login } from './pages/Login';
 import { SignUp } from './pages/SignUp';
 import { AuthCallback } from './pages/AuthCallback';
 import { Home } from './pages/Home';
+import { Info } from './pages/Info';
 import { StudentDashboard } from './pages/student/Dashboard';
 import { TeacherDashboard } from './pages/teacher/Dashboard';
 import { LibrarianDashboard } from './pages/librarian/Dashboard';
@@ -16,6 +17,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/info" element={<Info />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
