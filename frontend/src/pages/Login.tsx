@@ -42,17 +42,13 @@ export const Login = () => {
     }
   };
 
-  const quickLogin = (testEmail: string) => {
-    setEmail(testEmail);
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-400 via-orange-300 to-amber-300 p-4">
       <Card className="w-full max-w-md border-2 border-white/50 shadow-2xl">
           <CardHeader className="text-center">
           <div className="mb-4">
             <h1 className="text-3xl font-extrabold text-primary mb-2">
-              St Peter's Library
+              Pageforge
             </h1>
             <p className="text-xl font-bold text-foreground">
               Reading Tracker
@@ -100,42 +96,15 @@ export const Login = () => {
             </Button>
           </form>
 
-          <div className="mt-6">
-            <p className="text-xs text-center text-muted-foreground mb-3">
-              Quick login (test accounts):
-            </p>
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => quickLogin('student3a1@stpeters.co.za')}
-              >
-                Student (Grade 3A)
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => quickLogin('teacher1@stpeters.co.za')}
-              >
-                Teacher (Grade 3A)
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => quickLogin('librarian@stpeters.co.za')}
-              >
-                Librarian
-              </Button>
-            </div>
-          </div>
-
           <p className="text-sm text-center text-muted-foreground mt-4">
             Don&apos;t have an account?{' '}
             <Link to="/signup" className="text-primary font-medium hover:underline">
               Sign up
+            </Link>
+          </p>
+          <p className="text-sm text-center mt-2">
+            <Link to="/" className="text-muted-foreground hover:underline">
+              ← Back to home
             </Link>
           </p>
         </CardContent>

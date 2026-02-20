@@ -80,7 +80,7 @@ export const SignUp = () => {
         <CardHeader className="text-center">
           <div className="mb-4">
             <h1 className="text-3xl font-extrabold text-primary mb-2">
-              St Peter's Library
+              Pageforge
             </h1>
             <p className="text-xl font-bold text-foreground">
               Student Sign Up
@@ -234,6 +234,11 @@ export const SignUp = () => {
             Already have an account?{' '}
             <Link to="/login" className="text-primary font-medium hover:underline">
               Sign in
+            </Link>
+          </p>
+          <p className="text-sm text-center mt-2">
+            <Link to="/" className="text-muted-foreground hover:underline">
+              ← Back to home
             </Link>
           </p>
         </CardContent>

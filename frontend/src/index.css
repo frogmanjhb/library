@@ -41,3 +41,24 @@
     font-weight: 800;
   }
 }
+
+/* Tier circle: slow pulse (10s) – plain CSS so duration is reliable */
+@keyframes tier-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 48px rgba(255, 107, 107, 0.6), 0 0 96px rgba(255, 107, 107, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 64px rgba(255, 107, 107, 0.95), 0 0 128px rgba(255, 107, 107, 0.5);
+  }
+}
+@keyframes tier-pulse-scale {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+.tier-circle-pulse {
+  animation: tier-glow-pulse 10s ease-in-out infinite, tier-pulse-scale 10s ease-in-out infinite;
+}

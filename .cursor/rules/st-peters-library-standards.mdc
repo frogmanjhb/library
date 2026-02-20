@@ -1,9 +1,9 @@
 ---
-description: Core development standards for St Peter's Library Reading Tracker
+description: Core development standards for Pageforge
 alwaysApply: true
 ---
 
-# Cursor Agent Rules — St Peter's Library Reading Tracker
+# Cursor Agent Rules — Pageforge
 
 ## 0) Role
 You are a Senior Full-Stack TypeScript Developer for this repo:

@@ -1,4 +1,4 @@
-# 📚 St Peter's Library Reading Tracker
+# 📚 Pageforge
 
 A comprehensive web application for tracking student reading progress, built for St Peter's school library.
 
@@ -280,5 +280,5 @@ For technical issues:
 
 ---
 
-**Built with ❤️ for St Peter's Library**
+**Built with ❤️ for Pageforge**
 

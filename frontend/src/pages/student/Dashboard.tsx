@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, Plus, LogOut, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { BookOpen, Plus, LogOut, Award, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { BookCard } from '@/components/BookCard';
-import { PointsBadge } from '@/components/PointsBadge';
 import { PointsSystemPanel } from '@/components/PointsSystemPanel';
 import { AnnouncementBanner } from '@/components/AnnouncementBanner';
 import { AddBookModal } from './AddBookModal';
+import { CertificateModal } from './CertificateModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { getTierProgress } from '@/lib/reading-tiers';
 import { motion } from 'framer-motion';
 
 interface LexileRecord {
@@ -47,6 +48,7 @@ export const StudentDashboard = () => {
   const [points, setPoints] = useState(0);
   const [stats, setStats] = useState({ totalBooks: 0, totalWords: 0, avgLexile: 0 });
   const [showAddBook, setShowAddBook] = useState(false);
+  const [showCertificates, setShowCertificates] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -136,6 +138,7 @@ export const StudentDashboard = () => {
 
   const pendingCount = books.filter((b) => b.status === 'PENDING').length;
   const rejectedCount = books.filter((b) => b.status === 'REJECTED').length;
+  const tierProgress = getTierProgress(points);
 
   if (loading) {
     return (
@@ -154,12 +157,19 @@ export const StudentDashboard = () => {
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-2">
                 <BookOpen className="w-8 h-8" />
-                St Peter's Library
+                Pageforge
               </h1>
               <p className="text-white/90 mt-1 font-medium">Welcome back, {user?.name}!</p>
             </div>
             <div className="flex items-center gap-4">
-              <PointsBadge points={points} size="lg" />
+              <Button
+                variant="secondary"
+                onClick={() => setShowCertificates(true)}
+                className="gap-2"
+              >
+                <Award className="w-4 h-4" />
+                Certificate
+              </Button>
               <Button variant="secondary" onClick={logout}>
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
@@ -268,33 +278,30 @@ export const StudentDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col md:flex-row md:items-center gap-6">
-                    {/* Level Display */}
                     <div className="flex items-center gap-3">
                       <Badge
                         variant="default"
                         className="text-3xl font-extrabold px-4 py-2 h-auto"
                       >
-                        Level {Math.floor(points / 100) + 1}
+                        {tierProgress.tierName}
                       </Badge>
                     </div>
-
-                    {/* Progress Bar */}
                     <div className="flex-1 space-y-2">
-                      <Progress value={((points % 100) / 100) * 100} className="h-3" />
+                      <Progress value={tierProgress.progressInTier * 100} className="h-3" />
                       <div className="flex justify-between text-sm text-muted-foreground">
                         <span>
-                          {(points % 100).toLocaleString()} / 100 XP
+                          {points.toLocaleString()} / {tierProgress.nextThreshold.toLocaleString()} pts
                         </span>
-                        <span>Level {Math.floor(points / 100) + 1}</span>
+                        <span>{tierProgress.tierName}</span>
                       </div>
                     </div>
-
-                    {/* Next Unlock */}
                     <div className="md:text-right">
                       <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
                         Next unlock
                       </div>
-                      <div className="text-sm font-semibold">Level {Math.floor(points / 100) + 2}</div>
+                      <div className="text-sm font-semibold">
+                        {tierProgress.nextTierName ?? (tierProgress.isMaxTier ? 'Max tier' : '—')}
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -392,6 +399,13 @@ export const StudentDashboard = () => {
           studentLexile={currentLexile}
         />
       )}
+
+      {/* Certificate Modal */}
+      <CertificateModal
+        isOpen={showCertificates}
+        onClose={() => setShowCertificates(false)}
+        currentPoints={points}
+      />
     </div>
   );
 };
