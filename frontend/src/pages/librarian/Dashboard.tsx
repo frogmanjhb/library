@@ -12,7 +12,7 @@ import { api } from '@/lib/api';
 import { CommentModal } from '../teacher/CommentModal';
 import { LibraryManagementModal } from '@/components/LibraryManagementModal';
 import { ApproveBookModal } from '@/components/ApproveBookModal';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { MILESTONES } from '@/lib/reading-tiers';
 import { LexileManagementContent } from './LexileManagement';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,7 +21,6 @@ const VALID_TABS = ['books', 'verification', 'announcements', 'lexile', 'certifi
 
 export const LibrarianDashboard = () => {
   const { logout } = useAuth();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const activeTab = VALID_TABS.includes(tabParam ?? '') ? tabParam! : 'books';
