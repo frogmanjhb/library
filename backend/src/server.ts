@@ -18,6 +18,7 @@ import announcementRoutes from './routes/announcements';
 import pointRoutes from './routes/points';
 import lexileRoutes from './routes/lexile';
 import adminRoutes from './routes/admin';
+import analyticsRoutes from './routes/analytics';
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -56,6 +57,7 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/points', pointRoutes);
 app.use('/api/lexile', lexileRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

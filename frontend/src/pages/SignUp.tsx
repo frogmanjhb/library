@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +31,8 @@ export const SignUp = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -185,31 +188,49 @@ export const SignUp = () => {
               )}
             </div>
 
-            <div>
+            <div className="relative">
               <Input
                 name="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="Password (min 6 characters)"
                 value={formData.password}
                 onChange={handleChange}
                 required
-                className={`h-12 ${!passwordLongEnough && formData.password ? 'border-red-500' : ''}`}
+                className={`h-12 pr-10 ${!passwordLongEnough && formData.password ? 'border-red-500' : ''}`}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded p-1"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={0}
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
               {!passwordLongEnough && formData.password && (
                 <p className="text-xs text-red-600 mt-1">Password must be at least 6 characters</p>
               )}
             </div>
 
-            <div>
+            <div className="relative">
               <Input
                 name="confirmPassword"
-                type="password"
+                type={showConfirmPassword ? 'text' : 'password'}
                 placeholder="Confirm Password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                className={`h-12 ${!passwordsMatch && formData.confirmPassword ? 'border-red-500' : ''}`}
+                className={`h-12 pr-10 ${!passwordsMatch && formData.confirmPassword ? 'border-red-500' : ''}`}
               />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded p-1"
+                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                tabIndex={0}
+              >
+                {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
               {!passwordsMatch && formData.confirmPassword && (
                 <p className="text-xs text-red-600 mt-1">Passwords do not match</p>
               )}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, LogOut, Megaphone, Settings, BarChart3, Library, Cog } from 'lucide-react';
+import { BookOpen, LogOut, Megaphone, Settings, BarChart3, Library, Cog, Award, BarChart2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,11 +12,28 @@ import { api } from '@/lib/api';
 import { CommentModal } from '../teacher/CommentModal';
 import { LibraryManagementModal } from '@/components/LibraryManagementModal';
 import { ApproveBookModal } from '@/components/ApproveBookModal';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MILESTONES } from '@/lib/reading-tiers';
+import { LexileManagementContent } from './LexileManagement';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const VALID_TABS = ['books', 'verification', 'announcements', 'lexile', 'certificates', 'analytics', 'management'];
 
 export const LibrarianDashboard = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const activeTab = VALID_TABS.includes(tabParam ?? '') ? tabParam! : 'books';
+
+  const setActiveTab = (value: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value === 'books') next.delete('tab');
+      else next.set('tab', value);
+      return next;
+    });
+  };
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [pendingBooks, setPendingBooks] = useState([]);
@@ -29,7 +46,16 @@ export const LibrarianDashboard = () => {
   const [filterGrade, setFilterGrade] = useState('');
   const [filterClass, setFilterClass] = useState('');
   const [loading, setLoading] = useState(true);
-  const [showLibraryManagement, setShowLibraryManagement] = useState(false);
+  const [certificatePreviewUrl, setCertificatePreviewUrl] = useState<string | null>(null);
+  // Analytics: students per tier
+  const [analyticsGroupBy, setAnalyticsGroupBy] = useState<'school' | 'grade' | 'class'>('school');
+  const [analyticsTierFilter, setAnalyticsTierFilter] = useState<string | null>(null);
+  const [analyticsData, setAnalyticsData] = useState<{
+    groups: { name: string; tierCounts: Record<string, number>; total: number }[];
+    tierNames: string[];
+    tierKeys: string[];
+  } | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   // Announcement management
   const [newAnnouncement, setNewAnnouncement] = useState('');
@@ -42,6 +68,25 @@ export const LibrarianDashboard = () => {
   useEffect(() => {
     filterBooks();
   }, [books, searchTerm, filterGrade, filterClass]);
+
+  // Fetch analytics (students per tier) when groupBy or tier filter changes
+  useEffect(() => {
+    let cancelled = false;
+    setAnalyticsLoading(true);
+    const params = new URLSearchParams({ groupBy: analyticsGroupBy });
+    if (analyticsTierFilter) params.set('tier', analyticsTierFilter);
+    api.get(`/api/analytics/tier-breakdown?${params}`)
+      .then((res) => {
+        if (!cancelled) setAnalyticsData(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setAnalyticsData({ groups: [], tierNames: [], tierKeys: [] });
+      })
+      .finally(() => {
+        if (!cancelled) setAnalyticsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [analyticsGroupBy, analyticsTierFilter]);
 
   const fetchData = async () => {
     try {
@@ -249,7 +294,7 @@ export const LibrarianDashboard = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="books" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="flex items-center gap-2">
             <TabsList className="flex flex-1 flex-wrap">
               <TabsTrigger value="books">All Books</TabsTrigger>
@@ -265,6 +310,14 @@ export const LibrarianDashboard = () => {
               <TabsTrigger value="lexile">
                 <BarChart3 className="w-4 h-4 mr-1.5" />
                 Lexile Levels
+              </TabsTrigger>
+              <TabsTrigger value="certificates">
+                <Award className="w-4 h-4 mr-1.5" />
+                Certificates
+              </TabsTrigger>
+              <TabsTrigger value="analytics">
+                <BarChart2 className="w-4 h-4 mr-1.5" />
+                Analytics
               </TabsTrigger>
               <div className="flex-1" />
               <TabsTrigger value="management">
@@ -487,45 +540,189 @@ export const LibrarianDashboard = () => {
           </TabsContent>
 
           <TabsContent value="lexile">
+            <LexileManagementContent />
+          </TabsContent>
+
+          <TabsContent value="certificates">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5" />
-                  Lexile Level Management
+                  <Award className="w-5 h-5" />
+                  Reading Tier Certificates
                 </CardTitle>
+                <p className="text-muted-foreground text-sm">
+                  All available certificates students can unlock by reaching reading tier thresholds. Click a certificate to view it full size.
+                </p>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Manage student Lexile levels, track progress across terms, and view trends.
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {MILESTONES.map((milestone) => {
+                    const filename = milestone.name === 'Beginner' ? 'Beginner.png' : `${milestone.name.toLowerCase()}.png`;
+                    return (
+                      <button
+                        key={milestone.key}
+                        type="button"
+                        onClick={() => setCertificatePreviewUrl(`/images/certificates/${filename}`)}
+                        className={`
+                          relative rounded-xl border-2 overflow-hidden transition-all text-left
+                          hover:shadow-lg hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2
+                          ${milestone.circleBg} ${milestone.circleBorder}
+                        `}
+                        aria-label={`View ${milestone.name} certificate`}
+                      >
+                        <div className="aspect-[3/4] flex items-center justify-center p-4">
+                          <img
+                            src={`/images/certificates/${filename}`}
+                            alt={`${milestone.name} certificate`}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div className="p-2 text-center border-t bg-background/80">
+                          <span className="font-semibold text-sm">{milestone.name}</span>
+                          <span className="block text-xs text-muted-foreground">{milestone.threshold} pts</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart2 className="w-5 h-5" />
+                  Students per Tier
+                </CardTitle>
+                <p className="text-muted-foreground text-sm">
+                  View student counts by reading tier. Filter by tier to see only that tier, or view all tiers. Group by school, grade, or class.
                 </p>
-                <Button onClick={() => navigate('/librarian/lexile')}>
-                  <BarChart3 className="w-4 h-4 mr-2" />
-                  Open Lexile Management
-                </Button>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Tier filter: tier images */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Filter by tier</label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAnalyticsTierFilter(null)}
+                      className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                        analyticsTierFilter === null
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-muted/50 border-muted hover:bg-muted'
+                      }`}
+                      aria-pressed={analyticsTierFilter === null}
+                    >
+                      All tiers
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnalyticsTierFilter('starter')}
+                      className={`flex items-center gap-2 rounded-xl border-2 border-gray-400 bg-gray-100 px-3 py-2 text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                        analyticsTierFilter === 'starter'
+                          ? 'ring-2 ring-ring ring-offset-2'
+                          : 'hover:bg-gray-200'
+                      }`}
+                      aria-pressed={analyticsTierFilter === 'starter'}
+                      title="Starter (below first tier)"
+                    >
+                      <span className="text-base opacity-80">○</span>
+                      Starter
+                    </button>
+                    {MILESTONES.map((milestone) => {
+                      const isSelected = analyticsTierFilter === milestone.key;
+                      return (
+                        <button
+                          key={milestone.key}
+                          type="button"
+                          onClick={() => setAnalyticsTierFilter(isSelected ? null : milestone.key)}
+                          className={`flex items-center gap-2 rounded-xl border-2 overflow-hidden transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                            isSelected
+                              ? 'ring-2 ring-ring ring-offset-2 ' + milestone.circleBorder
+                              : 'hover:shadow-md ' + milestone.circleBorder
+                          } ${milestone.circleBg}`}
+                          aria-pressed={isSelected}
+                          title={`${milestone.name} (${milestone.threshold}+ pts)`}
+                        >
+                          <img
+                            src={`/images/tiers/${milestone.key}.png`}
+                            alt=""
+                            className="w-8 h-8 object-contain object-center"
+                            aria-hidden
+                          />
+                          <span className="pr-2 text-sm font-medium">{milestone.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Group by: School / Grade / Class */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">View by</label>
+                  <Tabs
+                    value={analyticsGroupBy}
+                    onValueChange={(v) => setAnalyticsGroupBy(v as 'school' | 'grade' | 'class')}
+                    className="w-full"
+                  >
+                    <TabsList className="grid w-full max-w-md grid-cols-3">
+                      <TabsTrigger value="school">School</TabsTrigger>
+                      <TabsTrigger value="grade">Grade</TabsTrigger>
+                      <TabsTrigger value="class">Class</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+
+                {/* Table: groups × tier counts */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Counts</label>
+                  {analyticsLoading ? (
+                    <div className="rounded-lg border bg-muted/30 p-8 text-center text-muted-foreground">
+                      Loading…
+                    </div>
+                  ) : analyticsData && analyticsData.groups.length > 0 ? (
+                    <div className="overflow-x-auto rounded-lg border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="text-left p-3 font-semibold">Group</th>
+                            {analyticsData.tierNames.map((name, i) => (
+                              <th key={analyticsData.tierKeys[i] ?? i} className="p-3 font-semibold text-center">
+                                {name}
+                              </th>
+                            ))}
+                            <th className="p-3 font-semibold text-center">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analyticsData.groups.map((row) => (
+                            <tr key={row.name} className="border-b hover:bg-muted/30">
+                              <td className="p-3 font-medium">{row.name}</td>
+                              {analyticsData.tierKeys.map((key) => (
+                                <td key={key} className="p-3 text-center">
+                                  {row.tierCounts[key] ?? 0}
+                                </td>
+                              ))}
+                              <td className="p-3 text-center font-medium">{row.total}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border bg-muted/30 p-8 text-center text-muted-foreground">
+                      No student data to show. Change filters or add students with points.
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="management">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Library className="w-5 h-5" />
-                  <Cog className="w-4 h-4 opacity-80" />
-                  Library Management
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground mb-4">
-                  Manage student data and book records. Add, edit, or delete students and books individually or in bulk.
-                </p>
-                <Button onClick={() => setShowLibraryManagement(true)}>
-                  <Library className="w-4 h-4 mr-2" />
-                  Open Library Management
-                  <Cog className="w-3 h-3 ml-1.5 opacity-80" aria-hidden />
-                </Button>
-              </CardContent>
-            </Card>
+            <LibraryManagementModal inline onDataChanged={fetchData} />
           </TabsContent>
         </Tabs>
       </main>
@@ -546,18 +743,42 @@ export const LibrarianDashboard = () => {
         book={editingBook}
       />
 
-      <LibraryManagementModal
-        isOpen={showLibraryManagement}
-        onClose={() => setShowLibraryManagement(false)}
-        onDataChanged={fetchData}
-      />
-
       <ApproveBookModal
         book={approvingBook}
         isOpen={!!approvingBook}
         onClose={() => setApprovingBook(null)}
         onApproved={handleBookApproved}
       />
+
+      {/* Full-size certificate preview */}
+      <AnimatePresence>
+        {certificatePreviewUrl && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/70 z-[60]"
+              onClick={() => setCertificatePreviewUrl(null)}
+              aria-hidden
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="fixed inset-4 z-[70] flex items-center justify-center p-4"
+              onClick={() => setCertificatePreviewUrl(null)}
+            >
+              <img
+                src={certificatePreviewUrl}
+                alt="Certificate full size"
+                className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

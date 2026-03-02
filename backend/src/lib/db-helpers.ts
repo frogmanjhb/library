@@ -676,6 +676,16 @@ export const getPointByUserId = async (userId: string): Promise<Point | null> =>
   return result.rows[0] || null;
 };
 
+/** Get points for multiple users in one query (e.g. for analytics). */
+export const getPointsByUserIds = async (userIds: string[]): Promise<Point[]> => {
+  if (userIds.length === 0) return [];
+  const result = await query<Point>(
+    'SELECT * FROM "Point" WHERE "userId" = ANY($1::uuid[])',
+    [userIds]
+  );
+  return result.rows;
+};
+
 export const createPoint = async (pointData: {
   userId: string;
   totalPoints?: number;

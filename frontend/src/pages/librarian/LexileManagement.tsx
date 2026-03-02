@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, LogOut, Upload, ArrowLeft, TrendingUp, TrendingDown, Minus, Save } from 'lucide-react';
+import { Upload, TrendingUp, TrendingDown, Minus, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 interface StudentLexileData {
   id: string;
@@ -29,9 +28,8 @@ interface BulkUploadResult {
   error?: string;
 }
 
-export const LexileManagement = () => {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
+/** Inline content for Lexile management (filters, bulk upload, table). Use in Dashboard tab or standalone page. */
+export const LexileManagementContent = () => {
   
   // Filter states
   const [selectedGrade, setSelectedGrade] = useState<string>('');
@@ -185,36 +183,9 @@ export const LexileManagement = () => {
   const years = [currentYear - 1, currentYear, currentYear + 1];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50/50 to-rose-50">
-      {/* Header */}
-      <header className="bg-primary text-white shadow-buttonHover">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold flex items-center gap-2">
-                <BookOpen className="w-8 h-8" />
-                Lexile Level Management
-              </h1>
-              <p className="text-white/90 mt-1 font-medium">Track and manage student lexile levels</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button variant="secondary" onClick={() => navigate('/librarian')}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Button>
-              <Button variant="secondary" onClick={logout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
-        {/* Filters */}
-        <Card className="mb-6">
+    <div className="space-y-6">
+      {/* Filters */}
+      <Card className="mb-6">
           <CardHeader>
             <CardTitle>Filters</CardTitle>
           </CardHeader>
@@ -448,7 +419,15 @@ Bob Wilson, 580"
             </div>
           </CardContent>
         </Card>
-      </main>
     </div>
   );
+};
+
+/** Standalone page: redirects to dashboard with Lexile tab so all content lives on one page. */
+export const LexileManagement = () => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    navigate('/librarian?tab=lexile', { replace: true });
+  }, [navigate]);
+  return null;
 };

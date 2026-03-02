@@ -28,7 +28,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
   const [formData, setFormData] = useState({
     title: '',
     author: '',
-    rating: 5,
+    rating: 0,
     comment: '',
     lexileLevel: '',
     ageRange: '',
@@ -43,7 +43,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
       setFormData({
         title: book.title || '',
         author: book.author || '',
-        rating: book.rating || 5,
+        rating: book.rating ?? 0,
         comment: book.comment || '',
         lexileLevel: book.lexileLevel?.toString() || '',
         ageRange: book.ageRange || '',
@@ -182,7 +182,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
       <div>
         <label className="block text-sm font-medium mb-1">
-          Book Lexile Level
+          Book Lexile Level <span className="text-muted-foreground font-normal">(optional)</span>
         </label>
         <Input
           type="number"
@@ -207,9 +207,10 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
       <div>
         <label className="block text-sm font-medium mb-1">
-          Your Thoughts
+          Your Thoughts <span className="text-red-500">*</span>
         </label>
         <textarea
+          required
           value={formData.comment}
           onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
           placeholder="What did you think about this book?"
@@ -219,7 +220,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
 
       <div className="flex gap-2 pt-4">
-        <Button type="submit" disabled={loading} className="flex-1">
+        <Button type="submit" disabled={loading || formData.rating < 1 || formData.rating > 5 || !formData.comment.trim()} className="flex-1">
           {loading ? 'Saving...' : book ? 'Update Book' : 'Submit for Verification'}
         </Button>
         {!inline && (

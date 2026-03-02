@@ -29,13 +29,16 @@ interface Book {
 }
 
 interface LibraryManagementModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  /** When false, renders as a modal (requires isOpen and onClose). When true, renders inline under a tab. */
+  inline?: boolean;
+  isOpen?: boolean;
+  onClose?: () => void;
   onDataChanged?: () => void;
 }
 
 export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
-  isOpen,
+  inline = false,
+  isOpen = false,
   onClose,
   onDataChanged,
 }) => {
@@ -91,11 +94,11 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen || inline) {
       setLoading(true);
       Promise.all([fetchStudents(), fetchBooks()]).finally(() => setLoading(false));
     }
-  }, [isOpen, filterGrade, filterClass]);
+  }, [isOpen, inline, filterGrade, filterClass]);
 
   // Reset class filter when grade filter changes
   useEffect(() => {
@@ -118,10 +121,10 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
   }, [bulkEditGrade, bulkEditClass]);
 
   useEffect(() => {
-    if (showAddBook && isOpen) {
+    if (showAddBook && (isOpen || inline)) {
       api.get('/api/admin/students').then((res) => setStudentsForBook(res.data)).catch(() => {});
     }
-  }, [showAddBook, isOpen]);
+  }, [showAddBook, isOpen, inline]);
 
   const handleClose = () => {
     setSelectedStudentIds(new Set());
@@ -138,7 +141,7 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
     setAddStudentGrade('');
     setAddStudentClass('');
     onDataChanged?.();
-    onClose();
+    if (!inline) onClose?.();
   };
 
   const toggleStudentSelection = (id: string) => {
@@ -378,38 +381,20 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
-        onClick={handleClose}
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      >
-        <Card
-          className="w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col border-2 border-primary/10 shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <CardHeader className="flex flex-row items-center justify-between pb-4 border-b">
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="w-6 h-6" />
-              Library Management
-            </CardTitle>
-            <Button variant="ghost" size="icon" onClick={handleClose} aria-label="Close">
-              <X className="w-5 h-5" />
-            </Button>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto pt-4">
+  const cardContent = (
+    <>
+      <CardHeader className="flex flex-row items-center justify-between pb-4 border-b">
+        <CardTitle className="flex items-center gap-2">
+          <BookOpen className="w-6 h-6" />
+          Library Management
+        </CardTitle>
+        {!inline && (
+          <Button variant="ghost" size="icon" onClick={handleClose} aria-label="Close">
+            <X className="w-5 h-5" />
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="flex-1 overflow-y-auto pt-4">
             <Tabs defaultValue="students" className="space-y-4">
               <TabsList className="grid w-full max-w-md grid-cols-2">
                 <TabsTrigger value="students" className="flex items-center gap-2">
@@ -817,7 +802,41 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
                 )}
               </TabsContent>
             </Tabs>
-          </CardContent>
+      </CardContent>
+    </>
+  );
+
+  if (inline) {
+    return (
+      <Card className="w-full max-w-5xl overflow-hidden flex flex-col border-2 border-primary/10 shadow-2xl">
+        {cardContent}
+      </Card>
+    );
+  }
+
+  if (!isOpen) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+        onClick={handleClose}
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <Card
+          className="w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col border-2 border-primary/10 shadow-2xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {cardContent}
         </Card>
       </motion.div>
 
