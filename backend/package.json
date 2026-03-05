@@ -7,7 +7,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed": "tsx ../scripts/seed.ts",
-    "clear-books": "tsx ./scripts/clear-books.ts"
+    "clear-books": "tsx ./scripts/clear-books.ts",
+    "backfill-lexile": "tsx ./scripts/backfill-lexile-from-user.ts",
+    "move-lexile-term2-to-term1": "tsx ./scripts/move-lexile-term2-to-term1.ts"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

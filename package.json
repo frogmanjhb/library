@@ -15,6 +15,7 @@
     "build": "npm run build:backend && npm run build:frontend",
     "seed": "npm run seed --workspace=backend",
     "clear-books": "npm run clear-books --workspace=backend",
+    "backfill-lexile": "npm run backfill-lexile --workspace=backend",
     "start": "npm run start --workspace=backend"
   },
   "devDependencies": {

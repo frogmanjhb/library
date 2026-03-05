@@ -2,6 +2,7 @@ import express from 'express';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { Role } from '../types/database';
+import { getCurrentTermAndYear } from '../lib/academic';
 import {
   getStudentLexile,
   findStudentLexiles,
@@ -12,36 +13,6 @@ import {
 } from '../lib/db-helpers';
 
 const router = express.Router();
-
-/**
- * Get current academic term and year
- */
-function getCurrentTermAndYear(): { term: number; year: number } {
-  const now = new Date();
-  const month = now.getMonth() + 1; // 1-12
-  const year = now.getFullYear();
-  
-  // Academic year typically runs from September to August
-  // Term 1: Sep-Dec, Term 2: Jan-Apr, Term 3: May-Aug
-  let term: number;
-  let academicYear: number;
-  
-  if (month >= 9) {
-    // Sep-Dec = Term 1 of next academic year
-    term = 1;
-    academicYear = year + 1; // Academic year is named by end year
-  } else if (month >= 5) {
-    // May-Aug = Term 3
-    term = 3;
-    academicYear = year;
-  } else {
-    // Jan-Apr = Term 2
-    term = 2;
-    academicYear = year;
-  }
-  
-  return { term, year: academicYear };
-}
 
 /**
  * Get student's current lexile level (most recent entry)

@@ -3,7 +3,8 @@ import bcrypt from 'bcrypt';
 import { generateToken, requireAuth } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { Role } from '../types/database';
-import { getUserByEmail, createUser, createPoint } from '../lib/db-helpers';
+import { getCurrentTermAndYear } from '../lib/academic';
+import { getUserByEmail, createUser, createPoint, upsertStudentLexile } from '../lib/db-helpers';
 
 const router = express.Router();
 
@@ -57,6 +58,17 @@ router.post('/signup', asyncHandler(async (req, res) => {
     userId: user.id,
     totalPoints: 0,
   });
+
+  // Sync signup lexile to StudentLexile so it appears in librarian and student dashboards
+  if (user.lexileLevel != null) {
+    const { term, year } = getCurrentTermAndYear();
+    await upsertStudentLexile({
+      userId: user.id,
+      term,
+      year,
+      lexile: user.lexileLevel,
+    });
+  }
 
   const token = generateToken(user.id, user.email, user.role);
 
