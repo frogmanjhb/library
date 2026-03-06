@@ -34,6 +34,8 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
     ageRange: '',
     genres: '',
     coverUrl: '',
+    bookType: 'FICTION' as 'FICTION' | 'NON_FICTION',
+    sourceType: 'HOME' as 'HOME' | 'LIBRARY' | 'CLASS_READER',
   });
   const [loading, setLoading] = useState(false);
   const [studentLexile, setStudentLexile] = useState<number | null>(propStudentLexile ?? null);
@@ -49,6 +51,8 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
         ageRange: book.ageRange || '',
         genres: book.genres?.join(', ') || '',
         coverUrl: book.coverUrl || '',
+        bookType: book.bookType || 'FICTION',
+        sourceType: book.sourceType || 'HOME',
       });
     }
   }, [book]);
@@ -67,9 +71,9 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
     const bookLexile = parseInt(formData.lexileLevel);
     if (!bookLexile || !studentLexile) return null;
     
-    if (bookLexile > studentLexile) return 3;
-    if (bookLexile >= studentLexile - 50) return 2;
-    return 1;
+    if (bookLexile > studentLexile) return 15;
+    if (bookLexile >= studentLexile - 50) return 10;
+    return 5;
   };
 
   const expectedPoints = getExpectedPoints();
@@ -138,12 +142,15 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
             <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-medium">Your Lexile Level: {studentLexile}L</p>
-              <p className="mt-1">Points are based on the book's lexile compared to yours:</p>
+              <p className="mt-1">Points are based on the book&apos;s Lexile compared to yours:</p>
               <ul className="mt-1 ml-4 list-disc">
-                <li><span className="font-medium text-emerald-700">3 points</span> — Book above your level (challenging read)</li>
-                <li><span className="font-medium text-blue-700">2 points</span> — Book at your level (just right)</li>
-                <li><span className="font-medium text-amber-700">1 point</span> — Book below your level</li>
+                <li><span className="font-medium text-emerald-700">15 points</span> — Book above your level (challenging read)</li>
+                <li><span className="font-medium text-blue-700">10 points</span> — Book at your level (just right)</li>
+                <li><span className="font-medium text-amber-700">5 points</span> — Book below your level</li>
               </ul>
+              <p className="mt-1">
+                Points are also awarded for thoughtful reviews of the book.
+              </p>
             </div>
           </div>
         </div>
@@ -182,10 +189,11 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
 
       <div>
         <label className="block text-sm font-medium mb-1">
-          Book Lexile Level <span className="text-muted-foreground font-normal">(optional)</span>
+          Book Lexile Level <span className="text-red-500">*</span>
         </label>
         <Input
           type="number"
+          required
           value={formData.lexileLevel}
           onChange={(e) => setFormData({ ...formData, lexileLevel: e.target.value })}
           placeholder="Enter Lexile Level"
@@ -195,12 +203,12 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
         </p>
         {expectedPoints !== null && (
           <p className={`text-xs mt-1 font-medium ${
-            expectedPoints === 3 ? 'text-emerald-600' : 
-            expectedPoints === 2 ? 'text-blue-600' : 'text-amber-600'
+            expectedPoints === 15 ? 'text-emerald-600' : 
+            expectedPoints === 10 ? 'text-blue-600' : 'text-amber-600'
           }`}>
             Expected: {expectedPoints} point{expectedPoints !== 1 ? 's' : ''} 
-            {expectedPoints === 3 ? ' (above your level!)' : 
-             expectedPoints === 2 ? ' (at your level)' : ' (below your level)'}
+            {expectedPoints === 15 ? ' (above your level!)' : 
+             expectedPoints === 10 ? ' (at your level)' : ' (below your level)'}
           </p>
         )}
       </div>
@@ -216,6 +224,74 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
           placeholder="What did you think about this book?"
           className="w-full min-h-[100px] rounded-xl border-2 border-input bg-background px-4 py-3 text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:border-primary/30"
         />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="block text-sm font-medium mb-2">
+            Book Type <span className="text-red-500">*</span>
+          </p>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="bookType"
+                value="FICTION"
+                checked={formData.bookType === 'FICTION'}
+                onChange={() => setFormData({ ...formData, bookType: 'FICTION' })}
+              />
+              <span>Fiction</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="bookType"
+                value="NON_FICTION"
+                checked={formData.bookType === 'NON_FICTION'}
+                onChange={() => setFormData({ ...formData, bookType: 'NON_FICTION' })}
+              />
+              <span>Non fiction</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <p className="block text-sm font-medium mb-2">
+            Where is this book from? <span className="text-red-500">*</span>
+          </p>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="sourceType"
+                value="HOME"
+                checked={formData.sourceType === 'HOME'}
+                onChange={() => setFormData({ ...formData, sourceType: 'HOME' })}
+              />
+              <span>Home Book</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="sourceType"
+                value="LIBRARY"
+                checked={formData.sourceType === 'LIBRARY'}
+                onChange={() => setFormData({ ...formData, sourceType: 'LIBRARY' })}
+              />
+              <span>Library Book</span>
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name="sourceType"
+                value="CLASS_READER"
+                checked={formData.sourceType === 'CLASS_READER'}
+                onChange={() => setFormData({ ...formData, sourceType: 'CLASS_READER' })}
+              />
+              <span>Class Reader</span>
+            </label>
+          </div>
+        </div>
       </div>
 
 
