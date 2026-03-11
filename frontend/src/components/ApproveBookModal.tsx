@@ -18,6 +18,7 @@ interface Book {
     name: string;
     grade?: number;
     class?: string;
+    currentLexile?: number | null;
   };
 }
 
@@ -112,17 +113,37 @@ export const ApproveBookModal: React.FC<ApproveBookModalProps> = ({
               </div>
 
               {/* Book Info */}
-              <div className="mb-6 p-4 bg-muted/50 rounded-lg border">
-                <h3 className="font-semibold text-lg mb-1">{book.title}</h3>
-                <p className="text-sm text-muted-foreground mb-2">
-                  by {book.author}
-                </p>
-                {book.user && (
-                  <p className="text-xs text-muted-foreground">
-                    Student: {book.user.name}
-                    {book.user.grade &&
-                      ` (Grade ${book.user.grade}${book.user.class || ''})`}
+              <div className="mb-6 p-4 bg-muted/50 rounded-lg border space-y-3">
+                <div>
+                  <h3 className="font-semibold text-lg mb-1">{book.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    by {book.author}
                   </p>
+                  {book.lexileLevel != null && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Book Lexile: {book.lexileLevel}L
+                    </p>
+                  )}
+                </div>
+                {book.user && (
+                  <div>
+                    <p className="text-sm font-medium">
+                      Student: {book.user.name}
+                      {book.user.grade &&
+                        ` (Grade ${book.user.grade}${book.user.class || ''})`}
+                    </p>
+                    {book.user.currentLexile != null && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Student Lexile: {book.user.currentLexile}L
+                      </p>
+                    )}
+                  </div>
+                )}
+                {book.comment && (
+                  <div className="pt-2 border-t">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Student&apos;s reflection</p>
+                    <p className="text-sm">{book.comment}</p>
+                  </div>
                 )}
               </div>
 

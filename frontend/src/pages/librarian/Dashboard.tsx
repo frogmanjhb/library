@@ -412,6 +412,8 @@ export const LibrarianDashboard = () => {
                         <tr className="border-b">
                           <th className="p-4 text-left font-semibold">Title</th>
                           <th className="p-4 text-left font-semibold">Student</th>
+                          <th className="p-4 text-left font-semibold">Student Lexile</th>
+                          <th className="p-4 text-left font-semibold">Book Lexile</th>
                           <th className="p-4 text-left font-semibold">Submitted</th>
                           <th className="p-4 text-left font-semibold">Rating</th>
                           <th className="p-4 text-left font-semibold">Reflection</th>
@@ -436,6 +438,12 @@ export const LibrarianDashboard = () => {
                                     : 'No class assigned'}
                                 </p>
                               </div>
+                            </td>
+                            <td className="p-4 align-top text-sm">
+                              {book.user?.currentLexile != null ? `${book.user.currentLexile}L` : '-'}
+                            </td>
+                            <td className="p-4 align-top text-sm">
+                              {book.lexileLevel != null ? `${book.lexileLevel}L` : '-'}
                             </td>
                             <td className="p-4 align-top text-sm">
                               {new Date(book.createdAt).toLocaleDateString()}
