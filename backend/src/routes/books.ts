@@ -91,15 +91,16 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
 
   // When returning PENDING books, enrich with student lexile for librarian scoring context
   if (statusParam === 'PENDING' && books.length > 0) {
-    const uniqueUserIds = [...new Set(books.map((b: { userId: string }) => b.userId))];
+    const uniqueUserIds = [...new Set(books.map((b) => b.userId))];
     const lexileMap: Record<string, number | null> = {};
     for (const uid of uniqueUserIds) {
       lexileMap[uid] = await getStudentCurrentLexile(uid);
     }
-    books = books.map((b: { userId: string; user?: { id: string; name: string; email?: string; grade?: number; class?: string | null }; [key: string]: unknown }) => ({
-      ...b,
-      user: b.user ? { ...b.user, currentLexile: lexileMap[b.userId] ?? null } : b.user,
-    }));
+    for (const book of books) {
+      if (book.user) {
+        (book.user as { currentLexile?: number | null }).currentLexile = lexileMap[book.userId] ?? null;
+      }
+    }
   }
 
   res.json(books);
