@@ -206,7 +206,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({
             expectedPoints === 15 ? 'text-emerald-600' : 
             expectedPoints === 10 ? 'text-blue-600' : 'text-amber-600'
           }`}>
-            Expected: {expectedPoints} point{expectedPoints !== 1 ? 's' : ''} 
+            Expected: {expectedPoints} points 
             {expectedPoints === 15 ? ' (above your level!)' : 
              expectedPoints === 10 ? ' (at your level)' : ' (below your level)'}
           </p>
