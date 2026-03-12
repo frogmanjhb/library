@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { BookOpen, LogOut, Megaphone, Settings, BarChart3, Library, Cog, Award, BarChart2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { useSearchParams } from 'react-router-dom';
 import { MILESTONES } from '@/lib/reading-tiers';
 import { LexileManagementContent } from './LexileManagement';
 import { motion, AnimatePresence } from 'framer-motion';
+import { X, BookOpen as BookIcon } from 'lucide-react';
 
 const VALID_TABS = ['books', 'verification', 'announcements', 'lexile', 'certificates', 'analytics', 'management'];
 
@@ -53,8 +54,117 @@ export const LibrarianDashboard = () => {
     groups: { name: string; tierCounts: Record<string, number>; total: number }[];
     tierNames: string[];
     tierKeys: string[];
+    students?: {
+      id: string;
+      name: string;
+      surname: string | null;
+      grade: number | null;
+      class: string | null;
+      points: number;
+      tierKey: string;
+      tierName: string;
+      tierDates?: Record<string, string | null>;
+    }[];
   } | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<{
+    id: string;
+    name: string;
+    surname: string | null;
+    grade: number | null;
+    class: string | null;
+    points: number;
+    tierKey: string;
+    tierName: string;
+    tierDates?: Record<string, string | null>;
+  } | null>(null);
+
+  const analyticsTierColumns = useMemo(
+    () => [
+      { key: 'starter', name: 'Starter', threshold: 0 },
+      ...MILESTONES.map((m) => ({
+        key: m.key,
+        name: m.name,
+        threshold: m.threshold,
+      })),
+    ],
+    [],
+  );
+
+  const [analyticsView, setAnalyticsView] = useState<'students' | 'progression'>('students');
+  const [analyticsStudentSearch, setAnalyticsStudentSearch] = useState('');
+  const [analyticsSort, setAnalyticsSort] = useState<{
+    key: 'name' | 'gradeClass' | 'tier' | 'points';
+    direction: 'asc' | 'desc';
+  }>({
+    key: 'name',
+    direction: 'asc',
+  });
+
+  const filteredAnalyticsStudents = useMemo(() => {
+    if (!analyticsData || !analyticsData.students) return [];
+    const term = analyticsStudentSearch.trim().toLowerCase();
+    let students = analyticsData.students;
+
+    if (term) {
+      students = students.filter((s) => {
+        const fullName = `${s.name} ${s.surname ?? ''}`.toLowerCase();
+        return fullName.includes(term);
+      });
+    }
+
+    const tierOrder = new Map<string, number>();
+    analyticsTierColumns.forEach((t, index) => {
+      tierOrder.set(t.key, index);
+    });
+
+    const sorted = [...students].sort((a, b) => {
+      let cmp = 0;
+      switch (analyticsSort.key) {
+        case 'name': {
+          const nameA = `${a.name} ${a.surname ?? ''}`.toLowerCase();
+          const nameB = `${b.name} ${b.surname ?? ''}`.toLowerCase();
+          cmp = nameA.localeCompare(nameB);
+          break;
+        }
+        case 'gradeClass': {
+          const gradeA = a.grade ?? 0;
+          const gradeB = b.grade ?? 0;
+          if (gradeA !== gradeB) {
+            cmp = gradeA - gradeB;
+          } else {
+            const classA = (a.class ?? '').toString();
+            const classB = (b.class ?? '').toString();
+            cmp = classA.localeCompare(classB);
+          }
+          break;
+        }
+        case 'tier': {
+          const orderA = tierOrder.get(a.tierKey) ?? 0;
+          const orderB = tierOrder.get(b.tierKey) ?? 0;
+          cmp = orderA - orderB;
+          break;
+        }
+        case 'points': {
+          cmp = a.points - b.points;
+          break;
+        }
+      }
+      return analyticsSort.direction === 'asc' ? cmp : -cmp;
+    });
+
+    return sorted;
+  }, [analyticsData, analyticsStudentSearch, analyticsTierColumns, analyticsSort]);
+
+  const handleAnalyticsSort = (key: 'name' | 'gradeClass' | 'tier' | 'points') => {
+    setAnalyticsSort((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
 
   // Announcement management
   const [newAnnouncement, setNewAnnouncement] = useState('');
@@ -72,14 +182,29 @@ export const LibrarianDashboard = () => {
   useEffect(() => {
     let cancelled = false;
     setAnalyticsLoading(true);
+    setAnalyticsError(null);
     const params = new URLSearchParams({ groupBy: analyticsGroupBy });
     if (analyticsTierFilter) params.set('tier', analyticsTierFilter);
     api.get(`/api/analytics/tier-breakdown?${params}`)
       .then((res) => {
-        if (!cancelled) setAnalyticsData(res.data);
+        if (!cancelled) {
+          const data = {
+            ...res.data,
+            students: Array.isArray(res.data.students) ? res.data.students : [],
+          };
+          setAnalyticsData(data);
+          setAnalyticsError(null);
+        }
       })
-      .catch(() => {
-        if (!cancelled) setAnalyticsData({ groups: [], tierNames: [], tierKeys: [] });
+      .catch((error: any) => {
+        if (!cancelled) {
+          const message =
+            (error.response?.data && typeof error.response.data.message === 'string'
+              ? error.response.data.message
+              : error.message) || 'Failed to load analytics';
+          setAnalyticsError(message);
+          setAnalyticsData(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setAnalyticsLoading(false);
@@ -682,46 +807,246 @@ export const LibrarianDashboard = () => {
                   </Tabs>
                 </div>
 
-                {/* Table: groups × tier counts */}
+                {/* Analytics view tabs */}
                 <div>
-                  <label className="block text-sm font-medium mb-2">Counts</label>
-                  {analyticsLoading ? (
-                    <div className="rounded-lg border bg-muted/30 p-8 text-center text-muted-foreground">
-                      Loading…
-                    </div>
-                  ) : analyticsData && analyticsData.groups.length > 0 ? (
-                    <div className="overflow-x-auto rounded-lg border">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b bg-muted/50">
-                            <th className="text-left p-3 font-semibold">Group</th>
-                            {analyticsData.tierNames.map((name, i) => (
-                              <th key={analyticsData.tierKeys[i] ?? i} className="p-3 font-semibold text-center">
-                                {name}
-                              </th>
-                            ))}
-                            <th className="p-3 font-semibold text-center">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {analyticsData.groups.map((row) => (
-                            <tr key={row.name} className="border-b hover:bg-muted/30">
-                              <td className="p-3 font-medium">{row.name}</td>
-                              {analyticsData.tierKeys.map((key) => (
-                                <td key={key} className="p-3 text-center">
-                                  {row.tierCounts[key] ?? 0}
-                                </td>
+                  <Tabs
+                    value={analyticsView}
+                    onValueChange={(v) => setAnalyticsView(v as 'students' | 'progression')}
+                    className="w-full"
+                  >
+                    <TabsList className="grid w-full max-w-md grid-cols-2">
+                      <TabsTrigger value="students">Students per Tier</TabsTrigger>
+                      <TabsTrigger value="progression">Tier progression</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+
+                {/* Students per Tier view */}
+                <div className="space-y-3">
+                  {analyticsView === 'students' && (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium mb-1">Students</label>
+                          <p className="text-xs text-muted-foreground">
+                            Click a student to view detailed reading stats.
+                          </p>
+                        </div>
+                        <div className="w-full sm:w-64">
+                          <label className="block text-xs font-medium mb-1">
+                            Search by name
+                          </label>
+                          <Input
+                            placeholder="Start typing a student name..."
+                            value={analyticsStudentSearch}
+                            onChange={(e) => setAnalyticsStudentSearch(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      {analyticsLoading ? (
+                        <div className="rounded-lg border bg-muted/30 p-6 text-center text-muted-foreground text-sm">
+                          Loading students…
+                        </div>
+                      ) : analyticsError ? (
+                        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-center text-sm text-destructive">
+                          Failed to load students: {analyticsError}
+                        </div>
+                      ) : filteredAnalyticsStudents.length > 0 ? (
+                        <div className="overflow-x-auto rounded-lg border">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th
+                                  className="p-3 text-left font-semibold cursor-pointer select-none"
+                                  onClick={() => handleAnalyticsSort('name')}
+                                >
+                                  Student
+                                  {analyticsSort.key === 'name' &&
+                                    (analyticsSort.direction === 'asc' ? ' ↑' : ' ↓')}
+                                </th>
+                                <th
+                                  className="p-3 text-left font-semibold cursor-pointer select-none"
+                                  onClick={() => handleAnalyticsSort('gradeClass')}
+                                >
+                                  Grade / Class
+                                  {analyticsSort.key === 'gradeClass' &&
+                                    (analyticsSort.direction === 'asc' ? ' ↑' : ' ↓')}
+                                </th>
+                                <th
+                                  className="p-3 text-center font-semibold cursor-pointer select-none"
+                                  onClick={() => handleAnalyticsSort('tier')}
+                                >
+                                  Tier
+                                  {analyticsSort.key === 'tier' &&
+                                    (analyticsSort.direction === 'asc' ? ' ↑' : ' ↓')}
+                                </th>
+                                <th
+                                  className="p-3 text-center font-semibold cursor-pointer select-none"
+                                  onClick={() => handleAnalyticsSort('points')}
+                                >
+                                  Points
+                                  {analyticsSort.key === 'points' &&
+                                    (analyticsSort.direction === 'asc' ? ' ↑' : ' ↓')}
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredAnalyticsStudents.map((s) => (
+                                <tr
+                                  key={s.id}
+                                  className="border-b hover:bg-muted/30 cursor-pointer"
+                                  onClick={() => setSelectedStudent(s)}
+                                >
+                                  <td className="p-3 font-medium">
+                                    {s.name}
+                                    {s.surname ? ` ${s.surname}` : ''}
+                                  </td>
+                                  <td className="p-3">
+                                    {s.grade != null ? `Grade ${s.grade}` : 'No grade'}
+                                    {s.class ? ` • ${s.class}` : ''}
+                                  </td>
+                                  <td className="p-3 text-center">{s.tierName}</td>
+                                  <td className="p-3 text-center">{s.points}</td>
+                                </tr>
                               ))}
-                              <td className="p-3 text-center font-medium">{row.total}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border bg-muted/30 p-8 text-center text-muted-foreground">
-                      No student data to show. Change filters or add students with points.
-                    </div>
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border bg-muted/30 p-6 text-center text-muted-foreground text-sm">
+                          No students found for the current filters or search.
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Tier progression view */}
+                  {analyticsView === 'progression' && (
+                    <>
+                      <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                        <div className="flex-1">
+                          <label className="block text-sm font-medium mb-1">
+                            Tier progression
+                          </label>
+                          <p className="text-xs text-muted-foreground">
+                            See which tiers each student has reached over time.
+                          </p>
+                        </div>
+                        <div className="w-full sm:w-64">
+                          <label className="block text-xs font-medium mb-1">
+                            Search by name
+                          </label>
+                          <Input
+                            placeholder="Start typing a student name..."
+                            value={analyticsStudentSearch}
+                            onChange={(e) => setAnalyticsStudentSearch(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      {analyticsLoading ? (
+                        <div className="rounded-lg border bg-muted/30 p-6 text-center text-muted-foreground text-sm">
+                          Loading tier progression…
+                        </div>
+                      ) : analyticsError ? (
+                        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-center text-sm text-destructive">
+                          Failed to load tier progression: {analyticsError}
+                        </div>
+                      ) : filteredAnalyticsStudents.length > 0 ? (
+                        <div className="overflow-x-auto rounded-lg border">
+                          <table className="w-full text-xs sm:text-sm">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th
+                                  className="p-3 text-left font-semibold cursor-pointer select-none"
+                                  onClick={() => handleAnalyticsSort('name')}
+                                >
+                                  Student
+                                  {analyticsSort.key === 'name' &&
+                                    (analyticsSort.direction === 'asc' ? ' ↑' : ' ↓')}
+                                </th>
+                                <th
+                                  className="p-3 text-left font-semibold cursor-pointer select-none"
+                                  onClick={() => handleAnalyticsSort('gradeClass')}
+                                >
+                                  Grade / Class
+                                  {analyticsSort.key === 'gradeClass' &&
+                                    (analyticsSort.direction === 'asc' ? ' ↑' : ' ↓')}
+                                </th>
+                                {analyticsTierColumns.map((tier) => (
+                                  <th key={tier.key} className="p-3 text-center font-semibold">
+                                    {tier.name}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredAnalyticsStudents.map((s) => (
+                                <tr
+                                  key={s.id}
+                                  className="border-b hover:bg-muted/30 cursor-pointer"
+                                  onClick={() => setSelectedStudent(s)}
+                                >
+                                  <td className="p-3 font-medium whitespace-nowrap">
+                                    {s.name}
+                                    {s.surname ? ` ${s.surname}` : ''}
+                                  </td>
+                                  <td className="p-3 whitespace-nowrap">
+                                    {s.grade != null ? `Grade ${s.grade}` : 'No grade'}
+                                    {s.class ? ` • ${s.class}` : ''}
+                                  </td>
+                                  {analyticsTierColumns.map((tier) => {
+                                    const achievedAtIso =
+                                      s.tierDates && tier.key in s.tierDates
+                                        ? s.tierDates[tier.key]
+                                        : null;
+                                    const achievedDate =
+                                      achievedAtIso != null
+                                        ? new Date(achievedAtIso).toLocaleDateString()
+                                        : null;
+                                    const reached =
+                                      tier.key === 'starter'
+                                        ? s.points >= 0
+                                        : s.points >= tier.threshold;
+                                    const isCurrent = s.tierKey === tier.key;
+                                    return (
+                                      <td
+                                        key={tier.key}
+                                        className="p-3 text-center align-middle"
+                                      >
+                                        {reached ? (
+                                          <div className="flex flex-col items-center gap-1">
+                                            <span
+                                              className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${
+                                                isCurrent
+                                                  ? 'bg-primary text-primary-foreground'
+                                                  : 'bg-emerald-100 text-emerald-700'
+                                              }`}
+                                            >
+                                              ✓
+                                            </span>
+                                            {achievedDate && (
+                                              <span className="text-[10px] text-muted-foreground">
+                                                {achievedDate}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <span className="text-muted-foreground/60">–</span>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border bg-muted/30 p-6 text-center text-muted-foreground text-sm">
+                          No students found for the current filters or search.
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </CardContent>
@@ -757,6 +1082,12 @@ export const LibrarianDashboard = () => {
         onApproved={handleBookApproved}
       />
 
+      {/* Student analytics detail modal */}
+      <StudentDetailModal
+        student={selectedStudent}
+        onClose={() => setSelectedStudent(null)}
+      />
+
       {/* Full-size certificate preview */}
       <AnimatePresence>
         {certificatePreviewUrl && (
@@ -787,6 +1118,224 @@ export const LibrarianDashboard = () => {
         )}
       </AnimatePresence>
     </div>
+  );
+};
+
+interface StudentDetailModalProps {
+  student: {
+    id: string;
+    name: string;
+    surname: string | null;
+    grade: number | null;
+    class: string | null;
+    points: number;
+    tierKey: string;
+    tierName: string;
+  } | null;
+  onClose: () => void;
+}
+
+const StudentDetailModal: React.FC<StudentDetailModalProps> = ({ student, onClose }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<{
+    totalBooks: number;
+    totalPoints: number;
+    totalWords: number;
+    avgLexile: number;
+  } | null>(null);
+  const [books, setBooks] = useState<any[]>([]);
+  const [currentLexile, setCurrentLexile] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!student) return;
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [statsRes, booksRes, lexileRes] = await Promise.all([
+          api.get(`/api/users/${student.id}/stats`),
+          api.get('/api/books', {
+            params: { userId: student.id, status: 'APPROVED', sortBy: 'createdAt', order: 'desc' },
+          }),
+          api.get(`/api/lexile/student/${student.id}`),
+        ]);
+        if (cancelled) return;
+        setStats(statsRes.data);
+        setBooks(booksRes.data);
+        setCurrentLexile(
+          typeof lexileRes.data?.currentLexile === 'number'
+            ? lexileRes.data.currentLexile
+            : null,
+        );
+      } catch (err: any) {
+        if (cancelled) return;
+        setError(
+          err.response?.data?.message ||
+            'Failed to load student details. Please try again.',
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [student]);
+
+  if (!student) return null;
+
+  return (
+    <AnimatePresence>
+      <>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+          onClick={onClose}
+        />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        >
+          <Card className="w-full max-w-3xl max-h-[90vh] overflow-y-auto border-2 border-primary/10 shadow-2xl">
+            <div className="p-6 space-y-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold flex flex-wrap items-baseline gap-3">
+                    <span>
+                      {student.name}
+                      {student.surname ? ` ${student.surname}` : ''}
+                    </span>
+                    {currentLexile != null && (
+                      <span className="text-base font-semibold text-primary">
+                        Lexile: {currentLexile}L
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {student.grade != null ? `Grade ${student.grade}` : 'No grade'}
+                    {student.class ? ` • ${student.class}` : ''}
+                    {' • '}
+                    Tier: <span className="font-semibold">{student.tierName}</span>
+                    {' • '}
+                    Points: <span className="font-semibold">{student.points}</span>
+                  </p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+
+              {loading ? (
+                <div className="rounded-lg border bg-muted/30 p-6 text-center text-muted-foreground">
+                  Loading student details…
+                </div>
+              ) : error ? (
+                <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {error}
+                </div>
+              ) : (
+                <>
+                  {stats && (
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      <Card className="p-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          Approved books
+                        </p>
+                        <p className="text-2xl font-bold">{stats.totalBooks}</p>
+                      </Card>
+                      <Card className="p-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          Total points
+                        </p>
+                        <p className="text-2xl font-bold">{stats.totalPoints}</p>
+                      </Card>
+                      <Card className="p-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          Total words read
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {stats.totalWords.toLocaleString()}
+                        </p>
+                      </Card>
+                      <Card className="p-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          Avg. book Lexile
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {stats.avgLexile ? `${stats.avgLexile}L` : '—'}
+                        </p>
+                      </Card>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <BookIcon className="w-4 h-4 text-primary" />
+                      <h3 className="text-lg font-semibold">Books read</h3>
+                    </div>
+                    {books.length === 0 ? (
+                      <div className="rounded-lg border bg-muted/30 p-6 text-center text-muted-foreground text-sm">
+                        No approved books found for this student yet.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-lg border">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b bg-muted/50">
+                              <th className="p-3 text-left font-semibold">Title</th>
+                              <th className="p-3 text-left font-semibold">Author</th>
+                              <th className="p-3 text-center font-semibold">Rating</th>
+                              <th className="p-3 text-center font-semibold">Lexile</th>
+                              <th className="p-3 text-center font-semibold">Points</th>
+                              <th className="p-3 text-center font-semibold">Date</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {books.map((book) => {
+                              const pointsForBook =
+                                book.pointsAwarded && typeof book.pointsAwardedValue === 'number'
+                                  ? book.pointsAwardedValue
+                                  : 0;
+                              return (
+                                <tr key={book.id} className="border-b hover:bg-muted/30">
+                                  <td className="p-3 font-medium">{book.title}</td>
+                                  <td className="p-3">{book.author}</td>
+                                  <td className="p-3 text-center">{book.rating}/5</td>
+                                  <td className="p-3 text-center">
+                                    {book.lexileLevel != null ? `${book.lexileLevel}L` : '—'}
+                                  </td>
+                                  <td className="p-3 text-center">{pointsForBook}</td>
+                                  <td className="p-3 text-center">
+                                    {book.createdAt
+                                      ? new Date(book.createdAt).toLocaleDateString()
+                                      : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </Card>
+        </motion.div>
+      </>
+    </AnimatePresence>
   );
 };
 

@@ -285,7 +285,9 @@ export const findBooks = async (where: {
 
   if (where.userId) {
     if (Array.isArray(where.userId)) {
-      conditions.push(`"userId" = ANY($${paramCount}::uuid[])`);
+      // Some deployments store "userId" as text instead of uuid; use text[]
+      // here to avoid operator mismatches (text = uuid).
+      conditions.push(`"userId" = ANY($${paramCount}::text[])`);
       values.push(where.userId);
     } else {
       conditions.push(`"userId" = $${paramCount}`);
@@ -680,7 +682,9 @@ export const getPointByUserId = async (userId: string): Promise<Point | null> =>
 export const getPointsByUserIds = async (userIds: string[]): Promise<Point[]> => {
   if (userIds.length === 0) return [];
   const result = await query<Point>(
-    'SELECT * FROM "Point" WHERE "userId" = ANY($1::uuid[])',
+    // Some production databases may have "userId" stored as text instead of uuid;
+    // use a text array here to avoid type mismatches (text = uuid).
+    'SELECT * FROM "Point" WHERE "userId" = ANY($1::text[])',
     [userIds]
   );
   return result.rows;

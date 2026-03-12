@@ -1,8 +1,8 @@
 import express from 'express';
-import { Role } from '../types/database';
+import { Role, BookStatus } from '../types/database';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { findUsers, getPointsByUserIds } from '../lib/db-helpers';
+import { findUsers, getPointsByUserIds, findBooks } from '../lib/db-helpers';
 import { getTierFromPoints, TIER_THRESHOLDS, STARTER_KEY, STARTER_NAME } from '../lib/tiers';
 
 const router = express.Router();
@@ -11,11 +11,14 @@ export type GroupBy = 'school' | 'grade' | 'class';
 
 interface StudentWithTier {
   id: string;
+  name: string;
+  surname: string | null;
   grade: number | null;
   class: string | null;
   points: number;
   tierKey: string;
   tierName: string;
+  tierDates: Record<string, string | null>;
 }
 
 /** GET /api/analytics/tier-breakdown?groupBy=school|grade|class&tier=optionalTierKey */
@@ -38,19 +41,86 @@ router.get('/tier-breakdown', requireAuth, requireLibrarian, asyncHandler(async 
   }
 
   const userIds = users.map(u => u.id);
-  const pointsRows = await getPointsByUserIds(userIds);
-  const pointsByUserId = new Map(pointsRows.map(p => [p.userId, p.totalPoints]));
+  let pointsByUserId = new Map<string, number>();
+
+  try {
+    const pointsRows = await getPointsByUserIds(userIds);
+    pointsByUserId = new Map(pointsRows.map(p => [p.userId, p.totalPoints]));
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+
+    // If the points table does not exist in the production database yet,
+    // fall back to treating all students as having 0 points instead of
+    // failing the entire analytics request.
+    if (err.code === '42P01') {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'Points table is missing when fetching analytics; treating all students as 0 points.',
+      );
+    } else {
+      throw error;
+    }
+  }
+
+  // Fetch approved books to derive when each tier was first reached
+  const approvedBooks = await findBooks({
+    userId: userIds,
+    status: BookStatus.APPROVED,
+  });
+
+  const booksByUserId = new Map<string, typeof approvedBooks>();
+  for (const book of approvedBooks) {
+    if (!book.pointsAwarded || !book.pointsAwardedValue || book.pointsAwardedValue <= 0) continue;
+    const list = booksByUserId.get(book.userId) ?? [];
+    list.push(book);
+    booksByUserId.set(book.userId, list);
+  }
+
+  const tierThresholds = [
+    { key: STARTER_KEY, threshold: 0 },
+    ...TIER_THRESHOLDS.map(t => ({ key: t.key, threshold: t.threshold })),
+  ];
 
   const students: StudentWithTier[] = users.map(user => {
     const points = pointsByUserId.get(user.id) ?? 0;
     const { key: tierKey, name: tierName } = getTierFromPoints(points);
+
+    // Calculate when each tier was first reached based on approved books
+    const tierDates: Record<string, string | null> = {};
+    for (const t of tierThresholds) {
+      tierDates[t.key] = null;
+    }
+
+    const booksForUser = (booksByUserId.get(user.id) ?? []).sort((a, b) => {
+      const aTime = (a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt as unknown as string)).getTime();
+      const bTime = (b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt as unknown as string)).getTime();
+      return aTime - bTime;
+    });
+
+    let runningPoints = 0;
+    for (const book of booksForUser) {
+      runningPoints += book.pointsAwardedValue ?? 0;
+      for (const t of tierThresholds) {
+        if (tierDates[t.key]) continue;
+        if (runningPoints >= t.threshold) {
+          const createdAt = book.createdAt instanceof Date
+            ? book.createdAt
+            : new Date(book.createdAt as unknown as string);
+          tierDates[t.key] = createdAt.toISOString();
+        }
+      }
+    }
+
     return {
       id: user.id,
+      name: user.name,
+      surname: user.surname,
       grade: user.grade,
       class: user.class,
       points,
       tierKey,
       tierName,
+      tierDates,
     };
   });
 
@@ -106,10 +176,23 @@ router.get('/tier-breakdown', requireAuth, requireLibrarian, asyncHandler(async 
       return a.name.localeCompare(b.name);
     });
 
+  const studentsForResponse = filtered.map(s => ({
+    id: s.id,
+    name: s.name,
+    surname: s.surname,
+    grade: s.grade,
+    class: s.class,
+    points: s.points,
+    tierKey: s.tierKey,
+    tierName: s.tierName,
+     tierDates: s.tierDates,
+  }));
+
   res.json({
     groups,
     tierNames: tierNamesForResponse,
     tierKeys: tierKeysForResponse,
+    students: studentsForResponse,
   });
 }));
 
