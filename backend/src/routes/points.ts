@@ -1,4 +1,5 @@
 import express from 'express';
+import { Role } from '../types/database';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { getPointByUserId, updatePoint } from '../lib/db-helpers';
@@ -8,6 +9,11 @@ const router = express.Router();
 // Get points for a user
 router.get('/:userId', requireAuth, asyncHandler(async (req, res) => {
   const { userId } = req.params;
+  const requester = req.user!;
+
+  if (requester.role === Role.STUDENT && userId !== requester.id) {
+    throw new AppError('Access denied', 403);
+  }
 
   const points = await getPointByUserId(userId);
 
@@ -19,7 +25,7 @@ router.get('/:userId', requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // Manually adjust points (librarian only)
-router.post('/adjust', requireLibrarian, asyncHandler(async (req, res) => {
+router.post('/adjust', requireAuth, requireLibrarian, asyncHandler(async (req, res) => {
   const { userId, amount } = req.body;
 
   if (!userId || amount === undefined) {

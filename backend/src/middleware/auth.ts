@@ -4,6 +4,11 @@ import { Role, User as DatabaseUser } from '../types/database';
 import { AppError } from './errorHandler';
 import { getUserById } from '../lib/db-helpers';
 
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable must be set');
+}
+
 interface JWTPayload {
   userId: string;
   email: string;
@@ -13,14 +18,14 @@ interface JWTPayload {
 export const generateToken = (userId: string, email: string, role: Role): string => {
   return jwt.sign(
     { userId, email, role },
-    process.env.JWT_SECRET || 'your-secret-key',
+    JWT_SECRET,
     { expiresIn: '7d' }
   );
 };
 
 export const verifyToken = (token: string): JWTPayload => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as JWTPayload;
+    return jwt.verify(token, JWT_SECRET) as JWTPayload;
   } catch (error) {
     throw new AppError('Invalid or expired token', 401);
   }

@@ -26,8 +26,6 @@ const router = express.Router();
 router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const user = req.user!;
   const { userId, grade, class: className, sortBy = 'createdAt', order = 'desc', status } = req.query;
-
-  let where: any = {};
   const statusParam = Array.isArray(status) ? status[0] : status;
 
   if (statusParam) {
@@ -40,6 +38,26 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
 
   // Build where clause for books
   let bookWhere: { userId?: string | string[]; status?: BookStatus } = {};
+  let teacherStudentIds: string[] | null = null;
+
+  const allowedSortBy = new Set([
+    'createdAt',
+    'updatedAt',
+    'title',
+    'author',
+    'rating',
+    'status',
+    'lexileLevel',
+    'wordCount',
+  ]);
+  const sortField = String(sortBy);
+  if (!allowedSortBy.has(sortField)) {
+    throw new AppError('Invalid sortBy', 400);
+  }
+  const orderRaw = String(order).toLowerCase();
+  if (orderRaw !== 'asc' && orderRaw !== 'desc') {
+    throw new AppError('Invalid order', 400);
+  }
 
   // Apply role-based filtering
   if (user.role === Role.STUDENT) {
@@ -51,7 +69,8 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
       grade: user.grade || undefined,
       class: user.class || undefined,
     });
-    bookWhere.userId = students.map(s => s.id);
+    teacherStudentIds = students.map((s) => s.id);
+    bookWhere.userId = teacherStudentIds;
     if (!statusParam) {
       bookWhere.status = BookStatus.APPROVED;
     }
@@ -63,21 +82,58 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
 
   // Apply additional filters
   if (userId) {
-    bookWhere.userId = userId as string;
+    const requestedUserId = String(userId);
+    if (user.role === Role.STUDENT) {
+      // Students can never override userId filtering
+    } else if (user.role === Role.TEACHER) {
+      if (!teacherStudentIds) {
+        throw new AppError('Teacher scope not available', 403);
+      }
+      if (!teacherStudentIds.includes(requestedUserId)) {
+        throw new AppError('Access denied', 403);
+      }
+      bookWhere.userId = requestedUserId;
+    } else {
+      // Librarians can filter by any userId
+      bookWhere.userId = requestedUserId;
+    }
   }
   if (grade) {
-    const students = await findUsers({
-      role: Role.STUDENT,
-      grade: parseInt(grade as string),
-    });
-    bookWhere.userId = students.map(s => s.id);
+    const requestedGrade = parseInt(String(grade), 10);
+    if (Number.isNaN(requestedGrade)) {
+      throw new AppError('Invalid grade filter', 400);
+    }
+    if (user.role === Role.STUDENT) {
+      // Students cannot filter by grade
+    } else if (user.role === Role.TEACHER) {
+      if (user.grade !== requestedGrade) {
+        throw new AppError('Access denied', 403);
+      }
+      // already scoped to teacher's grade/class
+    } else {
+      const students = await findUsers({
+        role: Role.STUDENT,
+        grade: requestedGrade,
+      });
+      bookWhere.userId = students.map((s) => s.id);
+    }
   }
   if (className) {
-    const students = await findUsers({
-      role: Role.STUDENT,
-      class: className as string,
-    });
-    bookWhere.userId = students.map(s => s.id);
+    const requestedClass = String(className);
+    if (user.role === Role.STUDENT) {
+      // Students cannot filter by class
+    } else if (user.role === Role.TEACHER) {
+      if (user.class !== requestedClass) {
+        throw new AppError('Access denied', 403);
+      }
+      // already scoped to teacher's grade/class
+    } else {
+      const students = await findUsers({
+        role: Role.STUDENT,
+        class: requestedClass,
+      });
+      bookWhere.userId = students.map((s) => s.id);
+    }
   }
 
   if (statusParam) {
@@ -86,7 +142,7 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
 
   let books = await findBooksWithRelations(
     bookWhere,
-    { field: sortBy as string, order: order as 'asc' | 'desc' }
+    { field: sortField, order: orderRaw as 'asc' | 'desc' }
   );
 
   // When returning PENDING books, enrich with student lexile for librarian scoring context

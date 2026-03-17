@@ -327,6 +327,16 @@ export const findBooksWithRelations = async (
   orderBy?: { field: string; order: 'asc' | 'desc' },
   limit?: number
 ): Promise<BookWithRelations[]> => {
+  const allowedOrderFields = new Set([
+    'createdAt',
+    'updatedAt',
+    'title',
+    'author',
+    'rating',
+    'status',
+    'lexileLevel',
+    'wordCount',
+  ]);
   const conditions: string[] = [];
   const values: unknown[] = [];
   let paramCount = 1;
@@ -348,9 +358,10 @@ export const findBooksWithRelations = async (
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const orderClause = orderBy
-    ? `ORDER BY b."${orderBy.field}" ${orderBy.order.toUpperCase()}`
-    : 'ORDER BY b."createdAt" DESC';
+  const safeOrderField =
+    orderBy && allowedOrderFields.has(orderBy.field) ? orderBy.field : 'createdAt';
+  const safeOrderDir = orderBy?.order === 'asc' ? 'ASC' : 'DESC';
+  const orderClause = `ORDER BY b."${safeOrderField}" ${safeOrderDir}`;
   const limitClause = limit ? `LIMIT $${paramCount}` : '';
   if (limit) {
     values.push(limit);
