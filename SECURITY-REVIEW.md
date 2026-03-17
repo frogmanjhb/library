@@ -16,6 +16,37 @@
 
 ---
 
+### Status (implemented fixes)
+
+The following high-impact security fixes have been implemented in the codebase:
+
+#### 1) JWT secret fallback removed (Critical)
+
+- **What changed**: Removed `process.env.JWT_SECRET || 'your-secret-key'` fallback and the backend now **fails fast on startup** if `JWT_SECRET` is not set. JWT signing and verification both use the required env var.
+- **Files changed**: `backend/src/middleware/auth.ts`
+- **Risk reduced**: Prevents trivial token forgery if production env is misconfigured.
+
+#### 2) SQL injection via `sortBy` / dynamic `ORDER BY` closed (Critical)
+
+- **What changed**:
+  - `GET /api/books` now validates `sortBy` and `order` against a strict allow-list (rejects invalid values with 400).
+  - `findBooksWithRelations` in `db-helpers.ts` now uses a server-side allow-list for `orderBy.field` and falls back to `createdAt DESC` if needed (defense-in-depth).
+- **Files changed**: `backend/src/routes/books.ts`, `backend/src/lib/db-helpers.ts`
+- **Risk reduced**: Removes attacker control over SQL identifiers in `ORDER BY`.
+
+#### 3) IDOR fixes (High)
+
+- **What changed**:
+  - Students can only fetch **their own** points: `GET /api/points/:userId` now blocks student access to other users’ IDs.
+  - Students can only fetch **their own** stats: `GET /users/:id/stats` now blocks cross-user access for students.
+  - Teachers can only fetch stats for students in **their own grade/class** (target must be a student with matching grade/class).
+  - `GET /api/books` no longer allows students to override access via `userId`, `grade`, or `class` query params; teachers’ `userId` filtering is restricted to their scoped student list.
+  - Fixed route middleware ordering so librarian-only point adjustment also requires authentication (`requireAuth` before `requireLibrarian`).
+- **Files changed**: `backend/src/routes/points.ts`, `backend/src/routes/users.ts`, `backend/src/routes/books.ts`
+- **Risk reduced**: Prevents direct API calls from retrieving peers’ points/stats and limits teacher access to intended cohorts.
+
+---
+
 ### AUTHENTICATION
 
 #### 1. How are JWTs created, signed, stored, validated, and expired?

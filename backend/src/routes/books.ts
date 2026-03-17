@@ -33,7 +33,7 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
     if (!Object.values(BookStatus).includes(normalizedStatus as BookStatus)) {
       throw new AppError('Invalid status filter', 400);
     }
-    where.status = normalizedStatus as BookStatus;
+    // status filter is applied to `bookWhere` below after role scoping
   }
 
   // Build where clause for books
