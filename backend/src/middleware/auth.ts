@@ -1,8 +1,33 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import path from 'path';
+import dotenv from 'dotenv';
+import fs from 'fs';
 import { Role, User as DatabaseUser } from '../types/database';
 import { AppError } from './errorHandler';
 import { getUserById } from '../lib/db-helpers';
+
+// Ensure JWT_SECRET is available even if this module is imported before
+// `server.ts` calls `dotenv.config()`.
+//
+// Note: `backend/.env` in this repo is sometimes saved as UTF-16LE on Windows,
+// so we do our own read + encoding detection instead of relying on dotenv's
+// default file reading.
+const envPath = path.resolve(__dirname, '../../.env');
+if (!process.env.JWT_SECRET && fs.existsSync(envPath)) {
+  const raw = fs.readFileSync(envPath);
+
+  // Heuristic: UTF-16LE content will contain null bytes when interpreted as utf8.
+  let utf8 = raw.toString('utf8');
+  if (utf8.includes('\u0000')) {
+    utf8 = raw.toString('utf16le');
+  }
+
+  const parsed = dotenv.parse(utf8);
+  if (parsed.JWT_SECRET) {
+    process.env.JWT_SECRET = parsed.JWT_SECRET;
+  }
+}
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {

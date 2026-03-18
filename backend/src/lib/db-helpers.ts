@@ -16,6 +16,33 @@ import {
   BookStatus,
 } from '../types/database';
 
+/**
+ * Maps items with a max concurrency to avoid exhausting the DB connection pool.
+ * This is important for endpoints that enrich each book with additional relations.
+ */
+async function mapWithConcurrencyLimit<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  const effectiveLimit = Math.max(1, Math.min(limit, items.length));
+  let nextIndex = 0;
+
+  const workers = Array.from({ length: effectiveLimit }, async () => {
+    while (true) {
+      const idx = nextIndex;
+      nextIndex += 1;
+      if (idx >= items.length) return;
+
+      results[idx] = await mapper(items[idx], idx);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
+
 // User queries
 export const getUserById = async (id: string): Promise<User | null> => {
   const result = await query<User>(
@@ -372,48 +399,49 @@ export const findBooksWithRelations = async (
     values
   );
 
-  // Fetch relations for each book
-  const booksWithRelations = await Promise.all(
-    result.rows.map(async (book) => {
-      const userResult = await query<User>(
-        'SELECT id, name, email, grade, class FROM "User" WHERE id = $1',
-        [book.userId]
-      );
+  // Fetch relations for each book.
+  // Important: do NOT use Promise.all across all books: it can exhaust the
+  // Postgres pool and cause connection timeouts (which surface as HTTP 500).
+  const booksWithRelations = await mapWithConcurrencyLimit(result.rows, 5, async (book) => {
+    const userResult = await query<User>(
+      'SELECT id, name, email, grade, class FROM "User" WHERE id = $1',
+      [book.userId]
+    );
 
-      let verifiedBy: User | null = null;
-      if (book.verifiedById) {
-        const verifiedByResult = await query<User>(
-          'SELECT id, name, email FROM "User" WHERE id = $1',
-          [book.verifiedById]
-        );
-        verifiedBy = verifiedByResult.rows[0] || null;
-      }
-
-      const commentsResult = await query<Comment>(
-        'SELECT * FROM "Comment" WHERE "bookId" = $1 ORDER BY "createdAt" DESC',
-        [book.id]
+    let verifiedBy: Pick<User, 'id' | 'name' | 'email'> | null = null;
+    if (book.verifiedById) {
+      const verifiedByResult = await query<User>(
+        'SELECT id, name, email FROM "User" WHERE id = $1',
+        [book.verifiedById]
       );
-      const comments = await Promise.all(
-        commentsResult.rows.map(async (comment) => {
-          const teacherResult = await query<User>(
-            'SELECT id, name, email FROM "User" WHERE id = $1',
-            [comment.teacherId]
-          );
-          return {
-            ...comment,
-            teacher: teacherResult.rows[0] || undefined,
-          };
-        })
-      );
+      verifiedBy = verifiedByResult.rows[0] || null;
+    }
 
-      return {
-        ...book,
-        user: userResult.rows[0] || undefined,
-        verifiedBy: verifiedBy || undefined,
-        comments,
-      };
-    })
-  );
+    const commentsResult = await query<Comment>(
+      'SELECT * FROM "Comment" WHERE "bookId" = $1 ORDER BY "createdAt" DESC',
+      [book.id]
+    );
+
+    // Sequential teacher lookup per comment to keep concurrency bounded.
+    const comments: CommentWithTeacher[] = [];
+    for (const comment of commentsResult.rows) {
+      const teacherResult = await query<User>(
+        'SELECT id, name, email FROM "User" WHERE id = $1',
+        [comment.teacherId]
+      );
+      comments.push({
+        ...comment,
+        teacher: teacherResult.rows[0] || undefined,
+      });
+    }
+
+    return {
+      ...book,
+      user: userResult.rows[0] || undefined,
+      verifiedBy: verifiedBy || undefined,
+      comments,
+    };
+  });
 
   return booksWithRelations;
 };

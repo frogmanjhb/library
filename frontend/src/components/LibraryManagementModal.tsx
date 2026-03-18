@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Users, BookOpen, Plus, Trash2, Pencil, Upload } from 'lucide-react';
+import { X, Users, BookOpen, Plus, Trash2, Pencil, Upload, UserPlus, KeyRound, UserCog } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,24 @@ interface Book {
   user: { id: string; name: string; email: string; grade?: number; class?: string };
 }
 
+interface Teacher {
+  id: string;
+  email: string;
+  name: string;
+  surname?: string | null;
+  grade: number | null;
+  class: string | null;
+}
+
+interface Librarian {
+  id: string;
+  email: string;
+  name: string;
+  surname?: string | null;
+  grade?: number | null;
+  class?: string | null;
+}
+
 interface LibraryManagementModalProps {
   /** When false, renders as a modal (requires isOpen and onClose). When true, renders inline under a tab. */
   inline?: boolean;
@@ -44,13 +62,18 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
 }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [books, setBooks] = useState<Book[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [librarians, setLibrarians] = useState<Librarian[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterGrade, setFilterGrade] = useState('');
   const [filterClass, setFilterClass] = useState('');
+  const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
   const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
+  const [editingLibrarian, setEditingLibrarian] = useState<Librarian | null>(null);
+  const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showAddBook, setShowAddBook] = useState(false);
   const [showBulkAddStudents, setShowBulkAddStudents] = useState(false);
@@ -63,6 +86,16 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
   const [addStudentGrade, setAddStudentGrade] = useState('');
   const [addStudentClass, setAddStudentClass] = useState('');
 
+  const [showAddTeacher, setShowAddTeacher] = useState(false);
+  const [addTeacherGrade, setAddTeacherGrade] = useState('');
+  const [addTeacherClass, setAddTeacherClass] = useState('');
+
+  const [showAddLibrarian, setShowAddLibrarian] = useState(false);
+
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [newLibrarianPassword, setNewLibrarianPassword] = useState('');
+  const [confirmLibrarianPassword, setConfirmLibrarianPassword] = useState('');
+
   // Class codes by grade
   const CLASSES_BY_GRADE: Record<string, string[]> = {
     '3': ['3SC', '3SCA', '3TB'],
@@ -71,6 +104,15 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
     '6': ['6A', '6B', '6C'],
     '7': ['7A', '7B', '7C'],
   };
+
+  const normalizedStudentSearch = studentSearch.trim().toLowerCase();
+  const visibleStudents = !normalizedStudentSearch
+    ? students
+    : students.filter((s) => {
+        const fullName = `${s.name} ${s.surname ?? ''}`.trim().toLowerCase();
+        const email = s.email.toLowerCase();
+        return fullName.includes(normalizedStudentSearch) || email.includes(normalizedStudentSearch);
+      });
 
   const fetchStudents = async () => {
     try {
@@ -93,10 +135,28 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
     }
   };
 
+  const fetchTeachers = async () => {
+    try {
+      const res = await api.get('/api/admin/teachers');
+      setTeachers(res.data);
+    } catch (err) {
+      console.error('Failed to fetch teachers:', err);
+    }
+  };
+
+  const fetchLibrarians = async () => {
+    try {
+      const res = await api.get('/api/admin/librarians');
+      setLibrarians(res.data);
+    } catch (err) {
+      console.error('Failed to fetch librarians:', err);
+    }
+  };
+
   useEffect(() => {
     if (isOpen || inline) {
       setLoading(true);
-      Promise.all([fetchStudents(), fetchBooks()]).finally(() => setLoading(false));
+      Promise.all([fetchStudents(), fetchBooks(), fetchTeachers(), fetchLibrarians()]).finally(() => setLoading(false));
     }
   }, [isOpen, inline, filterGrade, filterClass]);
 
@@ -131,6 +191,8 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
     setSelectedBookIds(new Set());
     setEditingStudent(null);
     setEditingBook(null);
+    setEditingLibrarian(null);
+    setEditingTeacher(null);
     setShowAddStudent(false);
     setShowAddBook(false);
     setShowBulkAddStudents(false);
@@ -140,6 +202,13 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
     setBulkEditClass('');
     setAddStudentGrade('');
     setAddStudentClass('');
+    setShowAddTeacher(false);
+    setAddTeacherGrade('');
+    setAddTeacherClass('');
+    setShowAddLibrarian(false);
+    setChangingPassword(false);
+    setNewLibrarianPassword('');
+    setConfirmLibrarianPassword('');
     onDataChanged?.();
     if (!inline) onClose?.();
   };
@@ -163,10 +232,20 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
   };
 
   const toggleAllStudents = () => {
-    if (selectedStudentIds.size === students.length) {
-      setSelectedStudentIds(new Set());
+    const visibleIds = visibleStudents.map((s) => s.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedStudentIds.has(id));
+    if (allVisibleSelected) {
+      setSelectedStudentIds((prev) => {
+        const next = new Set(prev);
+        for (const id of visibleIds) next.delete(id);
+        return next;
+      });
     } else {
-      setSelectedStudentIds(new Set(students.map((s) => s.id)));
+      setSelectedStudentIds((prev) => {
+        const next = new Set(prev);
+        for (const id of visibleIds) next.add(id);
+        return next;
+      });
     }
   };
 
@@ -205,6 +284,175 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
       alert(msg || 'Failed to add student');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAddTeacher = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+
+    const name = (form.elements.namedItem('teacherName') as HTMLInputElement).value.trim();
+    const surname = (form.elements.namedItem('teacherSurname') as HTMLInputElement).value.trim();
+    const email = (form.elements.namedItem('teacherEmail') as HTMLInputElement).value.trim().toLowerCase();
+    const password = (form.elements.namedItem('teacherPassword') as HTMLInputElement).value;
+
+    if (!name || !surname || !email || !password) return;
+    if (!addTeacherGrade || !addTeacherClass) return;
+
+    const gradeNum = parseInt(addTeacherGrade, 10);
+    if (Number.isNaN(gradeNum)) return;
+
+    setSubmitting(true);
+    try {
+      await api.post('/api/admin/teachers', {
+        name,
+        surname,
+        grade: gradeNum,
+        class: addTeacherClass,
+        email,
+        password,
+      });
+      await fetchTeachers();
+      setShowAddTeacher(false);
+      setAddTeacherGrade('');
+      setAddTeacherClass('');
+      form.reset();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(msg || 'Failed to add teacher');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateTeacher = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingTeacher) return;
+
+    const form = e.currentTarget;
+    const name = (form.elements.namedItem('editTeacherName') as HTMLInputElement).value.trim();
+    const surname = (form.elements.namedItem('editTeacherSurname') as HTMLInputElement).value.trim();
+    const email = (form.elements.namedItem('editTeacherEmail') as HTMLInputElement).value.trim().toLowerCase();
+    const grade = (form.elements.namedItem('editTeacherGrade') as HTMLSelectElement).value;
+    const className = (form.elements.namedItem('editTeacherClass') as HTMLSelectElement).value;
+
+    if (!name || !surname || !email || !grade || !className) return;
+
+    const gradeNum = parseInt(grade, 10);
+    if (Number.isNaN(gradeNum)) return;
+
+    setSubmitting(true);
+    try {
+      await api.put(`/api/admin/teachers/${editingTeacher.id}`, {
+        name,
+        surname,
+        grade: gradeNum,
+        class: className,
+        email,
+      });
+      await fetchTeachers();
+      setEditingTeacher(null);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(msg || 'Failed to update teacher');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteTeacher = async (id: string) => {
+    if (!confirm('Delete this teacher?')) return;
+    try {
+      await api.delete(`/api/admin/teachers/${id}`);
+      await fetchTeachers();
+      if (editingTeacher?.id === id) setEditingTeacher(null);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(msg || 'Failed to delete teacher');
+    }
+  };
+
+  const handleAddLibrarian = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+
+    const name = (form.elements.namedItem('librarianName') as HTMLInputElement).value.trim();
+    const surname = (form.elements.namedItem('librarianSurname') as HTMLInputElement).value.trim();
+    const email = (form.elements.namedItem('librarianEmail') as HTMLInputElement).value.trim().toLowerCase();
+    const password = (form.elements.namedItem('librarianPassword') as HTMLInputElement).value;
+
+    if (!name || !surname || !email || !password) return;
+
+    setSubmitting(true);
+    try {
+      await api.post('/api/admin/librarians', {
+        name,
+        surname,
+        email,
+        password,
+      });
+      await fetchLibrarians();
+      setShowAddLibrarian(false);
+      form.reset();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(msg || 'Failed to add librarian');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateLibrarian = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingLibrarian) return;
+
+    const form = e.currentTarget;
+    const name = (form.elements.namedItem('editLibrarianName') as HTMLInputElement).value.trim();
+    const surname = (form.elements.namedItem('editLibrarianSurname') as HTMLInputElement).value.trim();
+    const email = (form.elements.namedItem('editLibrarianEmail') as HTMLInputElement).value.trim().toLowerCase();
+
+    if (!name || !surname || !email) return;
+
+    setSubmitting(true);
+    try {
+      await api.put(`/api/admin/librarians/${editingLibrarian.id}`, {
+        name,
+        surname,
+        email,
+      });
+      await fetchLibrarians();
+      setEditingLibrarian(null);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(msg || 'Failed to update librarian');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleUpdateLibrarianPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!newLibrarianPassword || !confirmLibrarianPassword) return;
+    if (newLibrarianPassword !== confirmLibrarianPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await api.post('/api/admin/librarians/password', {
+        newPassword: newLibrarianPassword,
+        confirmPassword: confirmLibrarianPassword,
+      });
+      setNewLibrarianPassword('');
+      setConfirmLibrarianPassword('');
+      alert('Password updated');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      alert(msg || 'Failed to update password');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -396,7 +644,7 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
       </CardHeader>
       <CardContent className="flex-1 overflow-y-auto pt-4">
             <Tabs defaultValue="students" className="space-y-4">
-              <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsList className="grid w-full max-w-3xl grid-cols-2 md:grid-cols-4">
                 <TabsTrigger value="students" className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   Student Data
@@ -404,6 +652,14 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
                 <TabsTrigger value="books" className="flex items-center gap-2">
                   <BookOpen className="w-4 h-4" />
                   Book Data
+                </TabsTrigger>
+                <TabsTrigger value="teachers" className="flex items-center gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  Teacher Data
+                </TabsTrigger>
+                <TabsTrigger value="librarians" className="flex items-center gap-2">
+                  <UserCog className="w-4 h-4" />
+                  Librarian Data
                 </TabsTrigger>
               </TabsList>
 
@@ -449,6 +705,18 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
                         ))
                       )}
                     </select>
+                  </div>
+                  <div>
+                    <label htmlFor="studentSearch" className="block text-sm font-medium mb-1 sr-only">
+                      Search students
+                    </label>
+                    <Input
+                      id="studentSearch"
+                      value={studentSearch}
+                      onChange={(e) => setStudentSearch(e.target.value)}
+                      placeholder="Search name or email"
+                      className="h-11 w-64 max-w-full rounded-xl"
+                    />
                   </div>
                   <Button size="sm" onClick={() => setShowAddStudent(true)}>
                     <Plus className="w-4 h-4 mr-1" />
@@ -651,15 +919,25 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
                 {/* Student table */}
                 {loading ? (
                   <p className="text-muted-foreground">Loading...</p>
-                ) : students.length === 0 ? (
-                  <Card className="p-6 text-center text-muted-foreground">No students found</Card>
+                ) : visibleStudents.length === 0 ? (
+                  <Card className="p-6 text-center text-muted-foreground">
+                    {students.length === 0 ? 'No students found' : 'No students match your search/filters'}
+                  </Card>
                 ) : (
                   <div className="overflow-x-auto rounded-xl border-2 border-border">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-muted/50">
                           <th className="p-3 text-left">
-                            <input type="checkbox" checked={selectedStudentIds.size === students.length} onChange={toggleAllStudents} aria-label="Select all" />
+                            <input
+                              type="checkbox"
+                              checked={
+                                visibleStudents.length > 0 &&
+                                visibleStudents.every((s) => selectedStudentIds.has(s.id))
+                              }
+                              onChange={toggleAllStudents}
+                              aria-label="Select all visible"
+                            />
                           </th>
                           <th className="p-3 font-semibold">Name</th>
                           <th className="p-3 font-semibold">Email</th>
@@ -669,7 +947,7 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
                         </tr>
                       </thead>
                       <tbody>
-                        {students.map((s) => (
+                        {visibleStudents.map((s) => (
                           <tr key={s.id} className="border-b hover:bg-muted/30">
                             <td className="p-3">
                               <input type="checkbox" checked={selectedStudentIds.has(s.id)} onChange={() => toggleStudentSelection(s.id)} aria-label={`Select ${s.name}`} />
@@ -694,6 +972,384 @@ export const LibraryManagementModal: React.FC<LibraryManagementModalProps> = ({
                     </table>
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="teachers" className="space-y-4">
+                <div className="flex flex-wrap gap-2 items-end">
+                  <Button size="sm" onClick={() => { setShowAddTeacher(true); setEditingTeacher(null); }}>
+                    <UserPlus className="w-4 h-4 mr-1" />
+                    Add Teacher
+                  </Button>
+                </div>
+
+                {showAddTeacher && (
+                  <Card>
+                    <CardContent className="pt-4">
+                      <form onSubmit={handleAddTeacher} className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label htmlFor="teacherName" className="block text-sm font-medium mb-1">Name</label>
+                            <Input id="teacherName" name="teacherName" required placeholder="Teacher name" />
+                          </div>
+                          <div>
+                            <label htmlFor="teacherSurname" className="block text-sm font-medium mb-1">Surname</label>
+                            <Input id="teacherSurname" name="teacherSurname" required placeholder="Teacher surname" />
+                          </div>
+                          <div>
+                            <label htmlFor="teacherEmail" className="block text-sm font-medium mb-1">Email</label>
+                            <Input id="teacherEmail" name="teacherEmail" type="email" required placeholder="name@stpeters.co.za" />
+                          </div>
+                          <div>
+                            <label htmlFor="teacherPassword" className="block text-sm font-medium mb-1">Password</label>
+                            <Input id="teacherPassword" name="teacherPassword" type="password" required placeholder="Set a password" />
+                          </div>
+                          <div>
+                            <label htmlFor="teacherGrade" className="block text-sm font-medium mb-1">Grade</label>
+                            <select
+                              id="teacherGrade"
+                              name="teacherGrade"
+                              value={addTeacherGrade}
+                              onChange={(e) => {
+                                setAddTeacherGrade(e.target.value);
+                                setAddTeacherClass('');
+                              }}
+                              className="h-11 w-full rounded-xl border-2 border-input px-4"
+                            >
+                              <option value="">—</option>
+                              {[3, 4, 5, 6, 7].map((g) => (
+                                <option key={g} value={g.toString()}>Grade {g}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label htmlFor="teacherClass" className="block text-sm font-medium mb-1">Class</label>
+                            <select
+                              id="teacherClass"
+                              name="teacherClass"
+                              value={addTeacherClass}
+                              onChange={(e) => setAddTeacherClass(e.target.value)}
+                              className="h-11 w-full rounded-xl border-2 border-input px-4 disabled:opacity-50"
+                              disabled={!addTeacherGrade}
+                            >
+                              <option value="">—</option>
+                              {addTeacherGrade &&
+                                (CLASSES_BY_GRADE[addTeacherGrade] || []).map((cls) => (
+                                  <option key={cls} value={cls}>{cls}</option>
+                                ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button type="submit" disabled={submitting}>
+                            {submitting ? 'Adding...' : 'Add Teacher'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setShowAddTeacher(false);
+                              setAddTeacherGrade('');
+                              setAddTeacherClass('');
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {editingTeacher && (
+                  <Card>
+                    <CardContent className="pt-4">
+                      <form onSubmit={handleUpdateTeacher} className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label htmlFor="editTeacherName" className="block text-sm font-medium mb-1">Name</label>
+                            <Input id="editTeacherName" name="editTeacherName" defaultValue={editingTeacher.name} required />
+                          </div>
+                          <div>
+                            <label htmlFor="editTeacherSurname" className="block text-sm font-medium mb-1">Surname</label>
+                            <Input id="editTeacherSurname" name="editTeacherSurname" defaultValue={editingTeacher.surname ?? ''} required />
+                          </div>
+                          <div>
+                            <label htmlFor="editTeacherEmail" className="block text-sm font-medium mb-1">Email</label>
+                            <Input id="editTeacherEmail" name="editTeacherEmail" type="email" defaultValue={editingTeacher.email} required />
+                          </div>
+                          <div>
+                            <label htmlFor="editTeacherGrade" className="block text-sm font-medium mb-1">Grade</label>
+                            <select
+                              id="editTeacherGrade"
+                              name="editTeacherGrade"
+                              className="h-11 w-full rounded-xl border-2 border-input px-4"
+                              defaultValue={editingTeacher.grade ?? ''}
+                            >
+                              <option value="">—</option>
+                              {[3, 4, 5, 6, 7].map((g) => (
+                                <option key={g} value={g.toString()}>Grade {g}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label htmlFor="editTeacherClass" className="block text-sm font-medium mb-1">Class</label>
+                            <select
+                              id="editTeacherClass"
+                              name="editTeacherClass"
+                              className="h-11 w-full rounded-xl border-2 border-input px-4"
+                              defaultValue={editingTeacher.class ?? ''}
+                            >
+                              <option value="">—</option>
+                              {Object.values(CLASSES_BY_GRADE).flat().map((cls) => (
+                                <option key={cls} value={cls}>{cls}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button type="submit" disabled={submitting}>
+                            {submitting ? 'Saving...' : 'Save'}
+                          </Button>
+                          <Button type="button" variant="outline" onClick={() => setEditingTeacher(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {loading ? (
+                  <p className="text-muted-foreground">Loading...</p>
+                ) : teachers.length === 0 ? (
+                  <Card className="p-6 text-center text-muted-foreground">No teachers found</Card>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border-2 border-border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="p-3 text-left font-semibold">Name</th>
+                          <th className="p-3 text-left font-semibold">Email</th>
+                          <th className="p-3 font-semibold">Grade</th>
+                          <th className="p-3 font-semibold">Class</th>
+                          <th className="p-3 font-semibold">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {teachers.map((t) => (
+                          <tr key={t.id} className="border-b hover:bg-muted/30">
+                            <td className="p-3">
+                              {t.name} {t.surname ?? ''}
+                            </td>
+                            <td className="p-3">{t.email}</td>
+                            <td className="p-3">{t.grade ?? '—'}</td>
+                            <td className="p-3">{t.class ?? '—'}</td>
+                            <td className="p-3">
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    setEditingTeacher(t);
+                                    setShowAddTeacher(false);
+                                  }}
+                                  aria-label={`Edit ${t.name}`}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteTeacher(t.id)}
+                                  aria-label={`Delete ${t.name}`}
+                                >
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="librarians" className="space-y-4">
+                <div className="flex flex-wrap gap-2 items-end">
+                  <Button size="sm" onClick={() => { setShowAddLibrarian(true); setEditingLibrarian(null); }}>
+                    <UserPlus className="w-4 h-4 mr-1" />
+                    Add Librarian
+                  </Button>
+                </div>
+
+                {showAddLibrarian && (
+                  <Card>
+                    <CardContent className="pt-4">
+                      <form onSubmit={handleAddLibrarian} className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label htmlFor="librarianName" className="block text-sm font-medium mb-1">Name</label>
+                            <Input id="librarianName" name="librarianName" required placeholder="Librarian name" />
+                          </div>
+                          <div>
+                            <label htmlFor="librarianSurname" className="block text-sm font-medium mb-1">Surname</label>
+                            <Input id="librarianSurname" name="librarianSurname" required placeholder="Librarian surname" />
+                          </div>
+                          <div>
+                            <label htmlFor="librarianEmail" className="block text-sm font-medium mb-1">Email</label>
+                            <Input id="librarianEmail" name="librarianEmail" type="email" required placeholder="name@stpeters.co.za" />
+                          </div>
+                          <div>
+                            <label htmlFor="librarianPassword" className="block text-sm font-medium mb-1">Password</label>
+                            <Input id="librarianPassword" name="librarianPassword" type="password" required placeholder="Set a password" />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button type="submit" disabled={submitting}>
+                            {submitting ? 'Adding...' : 'Add Librarian'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowAddLibrarian(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {editingLibrarian && (
+                  <Card>
+                    <CardContent className="pt-4">
+                      <form onSubmit={handleUpdateLibrarian} className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label htmlFor="editLibrarianName" className="block text-sm font-medium mb-1">Name</label>
+                            <Input id="editLibrarianName" name="editLibrarianName" defaultValue={editingLibrarian.name} required />
+                          </div>
+                          <div>
+                            <label htmlFor="editLibrarianSurname" className="block text-sm font-medium mb-1">Surname</label>
+                            <Input id="editLibrarianSurname" name="editLibrarianSurname" defaultValue={editingLibrarian.surname ?? ''} required />
+                          </div>
+                          <div className="md:col-span-2">
+                            <label htmlFor="editLibrarianEmail" className="block text-sm font-medium mb-1">Email</label>
+                            <Input id="editLibrarianEmail" name="editLibrarianEmail" type="email" defaultValue={editingLibrarian.email} required />
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button type="submit" disabled={submitting}>
+                            {submitting ? 'Saving...' : 'Save'}
+                          </Button>
+                          <Button type="button" variant="outline" onClick={() => setEditingLibrarian(null)}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {loading ? (
+                  <p className="text-muted-foreground">Loading...</p>
+                ) : librarians.length === 0 ? (
+                  <Card className="p-6 text-center text-muted-foreground">No librarians found</Card>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border-2 border-border">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="p-3 text-left font-semibold">Name</th>
+                          <th className="p-3 text-left font-semibold">Email</th>
+                          <th className="p-3 font-semibold">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {librarians.map((l) => (
+                          <tr key={l.id} className="border-b hover:bg-muted/30">
+                            <td className="p-3">
+                              {l.name} {l.surname ?? ''}
+                            </td>
+                            <td className="p-3">{l.email}</td>
+                            <td className="p-3">
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => { setEditingLibrarian(l); setShowAddLibrarian(false); }}
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                  <span className="sr-only">Edit</span>
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <KeyRound className="w-5 h-5" />
+                      Update Your Password
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Set a new password for your librarian account.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleUpdateLibrarianPassword} className="space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label htmlFor="newLibrarianPassword" className="block text-sm font-medium mb-1">New Password</label>
+                          <Input
+                            id="newLibrarianPassword"
+                            type="password"
+                            value={newLibrarianPassword}
+                            onChange={(e) => setNewLibrarianPassword(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="confirmLibrarianPassword" className="block text-sm font-medium mb-1">Confirm Password</label>
+                          <Input
+                            id="confirmLibrarianPassword"
+                            type="password"
+                            value={confirmLibrarianPassword}
+                            onChange={(e) => setConfirmLibrarianPassword(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" disabled={changingPassword}>
+                          {changingPassword ? 'Updating...' : 'Update Password'}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={changingPassword}
+                          onClick={() => {
+                            setNewLibrarianPassword('');
+                            setConfirmLibrarianPassword('');
+                          }}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               <TabsContent value="books" className="space-y-4">

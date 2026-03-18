@@ -1,4 +1,5 @@
 import express from 'express';
+import bcrypt from 'bcrypt';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
 import { Role } from '../types/database';
@@ -26,6 +27,58 @@ interface StudentCreateInput {
   class?: string;
 }
 
+type PublicUser = {
+  id: string;
+  email: string;
+  name: string;
+  surname: string | null;
+  grade: number | null;
+  class: string | null;
+};
+
+const sanitizeUser = (u: {
+  id: string;
+  email: string;
+  name: string;
+  surname: string | null;
+  grade: number | null;
+  class: string | null;
+}): PublicUser => ({
+  id: u.id,
+  email: u.email,
+  name: u.name,
+  surname: u.surname,
+  grade: u.grade,
+  class: u.class,
+});
+
+const normalizeSchoolEmail = (email: unknown): string => {
+  if (typeof email !== 'string') throw new AppError('Email is required', 400);
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail.endsWith('@stpeters.co.za')) {
+    throw new AppError('Only @stpeters.co.za emails allowed', 400);
+  }
+  return normalizedEmail;
+};
+
+const parseAndValidateGrade = (grade: unknown): number => {
+  const gradeNum = typeof grade === 'number' ? grade : parseInt(String(grade), 10);
+  if (Number.isNaN(gradeNum) || gradeNum < 3 || gradeNum > 7) {
+    throw new AppError('Grade must be between 3 and 7', 400);
+  }
+  return gradeNum;
+};
+
+const validatePassword = (password: unknown): string => {
+  if (typeof password !== 'string' || !password.trim()) {
+    throw new AppError('Password is required', 400);
+  }
+  if (password.length < 6) {
+    throw new AppError('Password must be at least 6 characters', 400);
+  }
+  return password;
+};
+
 // List students with optional filters
 router.get('/students', asyncHandler(async (req, res) => {
   const { grade, class: className } = req.query;
@@ -43,7 +96,7 @@ router.get('/students', asyncHandler(async (req, res) => {
 
   const students = await findUsers(where);
 
-  res.json(students);
+  res.json(students.map((s) => sanitizeUser(s)));
 }));
 
 // Create student(s) - single or bulk
@@ -198,6 +251,252 @@ router.delete('/students/:id', asyncHandler(async (req, res) => {
   await deleteUser(id);
 
   res.json({ message: 'Student deleted successfully' });
+}));
+
+// List teachers
+router.get('/teachers', asyncHandler(async (req, res) => {
+  const teachers = await findUsers({ role: Role.TEACHER });
+  res.json(teachers.map((t) => sanitizeUser(t)));
+}));
+
+// Create a teacher account
+router.post('/teachers', asyncHandler(async (req, res) => {
+  const { name, surname, grade, class: className, email, password } = req.body as {
+    name?: unknown;
+    surname?: unknown;
+    grade?: unknown;
+    class?: unknown;
+    email?: unknown;
+    password?: unknown;
+  };
+
+  if (!name || !surname || grade === undefined || !className || !email || !password) {
+    throw new AppError('All fields are required', 400);
+  }
+
+  const gradeNum = parseAndValidateGrade(grade);
+  if (typeof className !== 'string' || !className.trim()) {
+    throw new AppError('Class is required', 400);
+  }
+
+  const normalizedEmail = normalizeSchoolEmail(email);
+  const existing = await getUserByEmail(normalizedEmail);
+  if (existing) {
+    throw new AppError('Email already exists', 400);
+  }
+
+  const passwordStr = validatePassword(password);
+  const passwordHash = await bcrypt.hash(passwordStr, 10);
+
+  const user = await createUser({
+    email: normalizedEmail,
+    name: String(name).trim(),
+    surname: String(surname).trim(),
+    passwordHash,
+    role: Role.TEACHER,
+    grade: gradeNum,
+    class: String(className).trim(),
+    lexileLevel: null,
+    googleId: null,
+  });
+
+  res.status(201).json({ created: sanitizeUser(user) });
+}));
+
+// Edit teacher details (excluding password)
+router.put('/teachers/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const teacher = await getUserById(id);
+
+  if (!teacher || teacher.role !== Role.TEACHER) {
+    throw new AppError('Teacher not found', 404);
+  }
+
+  const { name, surname, grade, class: className, email } = req.body as {
+    name?: unknown;
+    surname?: unknown;
+    grade?: unknown;
+    class?: unknown;
+    email?: unknown;
+  };
+
+  const updateData: Partial<{
+    email: string;
+    name: string;
+    surname: string | null;
+    grade: number | null;
+    class: string | null;
+  }> = {};
+
+  if (name !== undefined) {
+    if (typeof name !== 'string' || !name.trim()) throw new AppError('Name cannot be empty', 400);
+    updateData.name = name.trim();
+  }
+
+  if (surname !== undefined) {
+    if (typeof surname !== 'string' || !surname.trim()) throw new AppError('Surname cannot be empty', 400);
+    updateData.surname = surname.trim();
+  }
+
+  if (email !== undefined) {
+    const normalizedEmail = normalizeSchoolEmail(email);
+    const existing = await getUserByEmail(normalizedEmail);
+    if (existing && existing.id !== id) throw new AppError('Email already in use', 400);
+    updateData.email = normalizedEmail;
+  }
+
+  // Teacher's grade/class are required for scoping, but we allow partial updates.
+  if (grade !== undefined) {
+    updateData.grade = parseAndValidateGrade(grade);
+  }
+
+  if (className !== undefined) {
+    if (typeof className !== 'string' || !className.trim()) throw new AppError('Class is required', 400);
+    updateData.class = className.trim();
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new AppError('Provide at least one field to update', 400);
+  }
+
+  const updated = await updateUser(id, updateData);
+  res.json({ updated: sanitizeUser(updated) });
+}));
+
+// Delete teacher
+router.delete('/teachers/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const teacher = await getUserById(id);
+
+  if (!teacher || teacher.role !== Role.TEACHER) {
+    throw new AppError('Teacher not found', 404);
+  }
+
+  await deleteUser(id);
+  res.json({ message: 'Teacher deleted successfully' });
+}));
+
+// List librarians
+router.get('/librarians', asyncHandler(async (req, res) => {
+  const librarians = await findUsers({ role: Role.LIBRARIAN });
+  res.json(librarians.map((l) => sanitizeUser(l)));
+}));
+
+// Create a librarian account
+router.post('/librarians', asyncHandler(async (req, res) => {
+  const { name, surname, email, password } = req.body as {
+    name?: unknown;
+    surname?: unknown;
+    email?: unknown;
+    password?: unknown;
+  };
+
+  if (!name || !surname || !email || !password) {
+    throw new AppError('All fields are required', 400);
+  }
+
+  const normalizedEmail = normalizeSchoolEmail(email);
+  const existing = await getUserByEmail(normalizedEmail);
+  if (existing) {
+    throw new AppError('Email already exists', 400);
+  }
+
+  const passwordStr = validatePassword(password);
+  const passwordHash = await bcrypt.hash(passwordStr, 10);
+
+  const user = await createUser({
+    email: normalizedEmail,
+    name: String(name).trim(),
+    surname: String(surname).trim(),
+    passwordHash,
+    role: Role.LIBRARIAN,
+    grade: null,
+    class: null,
+    lexileLevel: null,
+    googleId: null,
+  });
+
+  res.status(201).json({ created: sanitizeUser(user) });
+}));
+
+// Edit librarian details (excluding password)
+router.put('/librarians/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const librarian = await getUserById(id);
+
+  if (!librarian || librarian.role !== Role.LIBRARIAN) {
+    throw new AppError('Librarian not found', 404);
+  }
+
+  const { name, surname, email } = req.body as {
+    name?: unknown;
+    surname?: unknown;
+    email?: unknown;
+  };
+
+  const updateData: Partial<{
+    email: string;
+    name: string;
+    surname: string | null;
+  }> = {};
+
+  if (name !== undefined) {
+    if (typeof name !== 'string' || !name.trim()) {
+      throw new AppError('Name cannot be empty', 400);
+    }
+    updateData.name = name.trim();
+  }
+
+  if (surname !== undefined) {
+    if (surname === null) updateData.surname = null;
+    else if (typeof surname === 'string') updateData.surname = surname.trim();
+    else throw new AppError('Surname must be a string', 400);
+  }
+
+  if (email !== undefined) {
+    const normalizedEmail = normalizeSchoolEmail(email);
+    const existing = await getUserByEmail(normalizedEmail);
+    if (existing && existing.id !== id) {
+      throw new AppError('Email already in use', 400);
+    }
+    updateData.email = normalizedEmail;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new AppError('Provide at least one field to update', 400);
+  }
+
+  const updated = await updateUser(id, updateData);
+  res.json({ updated: sanitizeUser(updated) });
+}));
+
+// Update current librarian password
+router.post('/librarians/password', asyncHandler(async (req, res) => {
+  const requester = req.user!;
+  if (requester.role !== Role.LIBRARIAN) {
+    throw new AppError('Insufficient permissions', 403);
+  }
+
+  const { newPassword, confirmPassword } = req.body as {
+    newPassword?: unknown;
+    confirmPassword?: unknown;
+  };
+
+  if (!newPassword || !confirmPassword) {
+    throw new AppError('Password and confirm password are required', 400);
+  }
+
+  const newPasswordStr = validatePassword(newPassword);
+  const confirmPasswordStr = typeof confirmPassword === 'string' ? confirmPassword : '';
+
+  if (newPasswordStr !== confirmPasswordStr) {
+    throw new AppError('Passwords do not match', 400);
+  }
+
+  const passwordHash = await bcrypt.hash(newPasswordStr, 10);
+  await updateUser(requester.id, { passwordHash });
+
+  res.json({ message: 'Password updated successfully' });
 }));
 
 export default router;
