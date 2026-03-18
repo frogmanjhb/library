@@ -7,6 +7,7 @@ import { AuthCallback } from './pages/AuthCallback';
 import { Home } from './pages/Home';
 import { Info } from './pages/Info';
 import { StudentDashboard } from './pages/student/Dashboard';
+import { HowToLogReading } from './pages/student/HowToLogReading';
 import { TeacherDashboard } from './pages/teacher/Dashboard';
 import { LibrarianDashboard } from './pages/librarian/Dashboard';
 import { LexileManagement } from './pages/librarian/LexileManagement';
@@ -27,6 +28,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['STUDENT']}>
                 <StudentDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/how-to-log"
+            element={
+              <ProtectedRoute allowedRoles={['STUDENT']}>
+                <HowToLogReading />
               </ProtectedRoute>
             }
           />

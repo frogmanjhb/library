@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, Plus, LogOut, Award, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { BookOpen, Plus, LogOut, Award, TrendingUp, TrendingDown, Minus, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -169,6 +170,12 @@ export const StudentDashboard = () => {
               >
                 <Award className="w-4 h-4" />
                 Certificate
+              </Button>
+              <Button asChild variant="secondary" className="gap-2">
+                <Link to="/student/how-to-log" aria-label="How to Log Your Reading">
+                  <Info className="w-4 h-4" />
+                  How to Log
+                </Link>
               </Button>
               <Button variant="secondary" onClick={logout}>
                 <LogOut className="w-4 h-4 mr-2" />
