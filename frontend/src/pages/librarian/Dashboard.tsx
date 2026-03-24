@@ -222,7 +222,7 @@ export const LibrarianDashboard = () => {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
-    const win = window.open('', '_blank', 'noopener,noreferrer');
+    const win = window.open('', 'analytics-print', 'popup=yes,width=1024,height=768');
     if (!win) {
       alert('Please allow popups to print analytics.');
       return;
@@ -271,18 +271,23 @@ export const LibrarianDashboard = () => {
       })
       .join('');
 
-    win.document.write(`
+    const html = `
+      <!doctype html>
       <html>
         <head>
           <title>Analytics Print</title>
+          <meta charset="utf-8" />
           <style>
-            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; background: #ffffff; }
             h1 { margin: 0 0 8px; font-size: 24px; }
             p.meta { margin: 0 0 4px; font-size: 12px; color: #4b5563; }
             table { width: 100%; border-collapse: collapse; margin-top: 16px; }
             th, td { border: 1px solid #d1d5db; padding: 8px; font-size: 12px; text-align: left; }
             th { background: #f3f4f6; }
             .empty { margin-top: 16px; padding: 12px; border: 1px solid #d1d5db; }
+            @media print {
+              body { padding: 12px; }
+            }
           </style>
         </head>
         <body>
@@ -307,10 +312,33 @@ export const LibrarianDashboard = () => {
           }
         </body>
       </html>
-    `);
-    win.document.close();
-    win.focus();
-    win.print();
+    `;
+
+    try {
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+
+      const printAfterRender = () => {
+        try {
+          win.print();
+        } catch {
+          alert('Could not start printing. Please try again.');
+        }
+      };
+
+      // Give the new document a moment to render before opening print dialog.
+      win.addEventListener('load', () => {
+        window.setTimeout(printAfterRender, 150);
+      }, { once: true });
+
+      // Fallback for browsers that do not reliably fire load on document.write.
+      window.setTimeout(printAfterRender, 500);
+    } catch {
+      alert('Unable to open printable analytics view. Please check popup permissions.');
+      win.close();
+    }
   };
 
   // Announcement management

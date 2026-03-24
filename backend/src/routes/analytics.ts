@@ -244,14 +244,25 @@ router.patch('/tier-award', requireAuth, requireLibrarian, asyncHandler(async (r
     throw new AppError('Student not found', 404);
   }
 
-  if (awarded) {
-    await upsertTierAward({
-      userId: studentId,
-      tierKey,
-      awardedById: req.user?.id ?? null,
-    });
-  } else {
-    await deleteTierAward(studentId, tierKey);
+  try {
+    if (awarded) {
+      await upsertTierAward({
+        userId: studentId,
+        tierKey,
+        awardedById: req.user?.id ?? null,
+      });
+    } else {
+      await deleteTierAward(studentId, tierKey);
+    }
+  } catch (error: unknown) {
+    const err = error as { code?: string };
+    if (err.code === '42P01') {
+      throw new AppError(
+        'Tier awards are not available yet. Please run the latest database migration for TierAward.',
+        503,
+      );
+    }
+    throw error;
   }
 
   res.json({ success: true });
