@@ -85,6 +85,16 @@ export interface StudentLexile {
   updatedAt: Date;
 }
 
+export interface TierAward {
+  id: string;
+  userId: string;
+  tierKey: string;
+  awardedAt: Date;
+  awardedById: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // Extended types with relations
 export interface BookWithRelations extends Book {
   user?: Pick<User, 'id' | 'name' | 'email' | 'grade' | 'class'>;

@@ -12,6 +12,7 @@ import {
   AnnouncementWithAuthor,
   CommentWithTeacher,
   StudentLexileWithUser,
+  TierAward,
   Role,
   BookStatus,
 } from '../types/database';
@@ -727,6 +728,40 @@ export const getPointsByUserIds = async (userIds: string[]): Promise<Point[]> =>
     [userIds]
   );
   return result.rows;
+};
+
+/** Get tier awards for multiple users in one query (e.g. analytics). */
+export const getTierAwardsByUserIds = async (userIds: string[]): Promise<TierAward[]> => {
+  if (userIds.length === 0) return [];
+  const result = await query<TierAward>(
+    'SELECT * FROM "TierAward" WHERE "userId" = ANY($1::text[])',
+    [userIds]
+  );
+  return result.rows;
+};
+
+export const upsertTierAward = async (data: {
+  userId: string;
+  tierKey: string;
+  awardedById?: string | null;
+}): Promise<TierAward> => {
+  const result = await query<TierAward>(
+    `INSERT INTO "TierAward" (id, "userId", "tierKey", "awardedAt", "awardedById", "createdAt", "updatedAt")
+     VALUES (gen_random_uuid(), $1, $2, NOW(), $3, NOW(), NOW())
+     ON CONFLICT ("userId", "tierKey")
+     DO UPDATE SET "awardedAt" = NOW(), "awardedById" = $3, "updatedAt" = NOW()
+     RETURNING *`,
+    [data.userId, data.tierKey, data.awardedById ?? null]
+  );
+  return result.rows[0];
+};
+
+export const deleteTierAward = async (userId: string, tierKey: string): Promise<number> => {
+  const result = await query(
+    'DELETE FROM "TierAward" WHERE "userId" = $1 AND "tierKey" = $2',
+    [userId, tierKey]
+  );
+  return result.rowCount ?? 0;
 };
 
 export const createPoint = async (pointData: {

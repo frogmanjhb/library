@@ -2,7 +2,14 @@ import express from 'express';
 import { Role, BookStatus } from '../types/database';
 import { requireAuth, requireLibrarian } from '../middleware/auth';
 import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { findUsers, getPointsByUserIds, findBooks } from '../lib/db-helpers';
+import {
+  findUsers,
+  getPointsByUserIds,
+  findBooks,
+  getTierAwardsByUserIds,
+  upsertTierAward,
+  deleteTierAward,
+} from '../lib/db-helpers';
 import { getTierFromPoints, TIER_THRESHOLDS, STARTER_KEY, STARTER_NAME } from '../lib/tiers';
 
 const router = express.Router();
@@ -19,6 +26,7 @@ interface StudentWithTier {
   tierKey: string;
   tierName: string;
   tierDates: Record<string, string | null>;
+  isTierAwarded: boolean;
 }
 
 /** GET /api/analytics/tier-breakdown?groupBy=school|grade|class&tier=optionalTierKey */
@@ -42,6 +50,7 @@ router.get('/tier-breakdown', requireAuth, requireLibrarian, asyncHandler(async 
 
   const userIds = users.map(u => u.id);
   let pointsByUserId = new Map<string, number>();
+  let awardedTierKeysByUserId = new Map<string, Set<string>>();
 
   try {
     const pointsRows = await getPointsByUserIds(userIds);
@@ -58,6 +67,21 @@ router.get('/tier-breakdown', requireAuth, requireLibrarian, asyncHandler(async 
         'Points table is missing when fetching analytics; treating all students as 0 points.',
       );
     } else {
+      throw error;
+    }
+  }
+
+  try {
+    const awards = await getTierAwardsByUserIds(userIds);
+    awardedTierKeysByUserId = awards.reduce<Map<string, Set<string>>>((acc, row) => {
+      const existing = acc.get(row.userId) ?? new Set<string>();
+      existing.add(row.tierKey);
+      acc.set(row.userId, existing);
+      return acc;
+    }, new Map<string, Set<string>>());
+  } catch (error: unknown) {
+    const err = error as { code?: string };
+    if (err.code !== '42P01') {
       throw error;
     }
   }
@@ -84,6 +108,7 @@ router.get('/tier-breakdown', requireAuth, requireLibrarian, asyncHandler(async 
   const students: StudentWithTier[] = users.map(user => {
     const points = pointsByUserId.get(user.id) ?? 0;
     const { key: tierKey, name: tierName } = getTierFromPoints(points);
+    const tierAwards = awardedTierKeysByUserId.get(user.id) ?? new Set<string>();
 
     // Calculate when each tier was first reached based on approved books
     const tierDates: Record<string, string | null> = {};
@@ -121,6 +146,7 @@ router.get('/tier-breakdown', requireAuth, requireLibrarian, asyncHandler(async 
       tierKey,
       tierName,
       tierDates,
+      isTierAwarded: tierAwards.has(tierKey),
     };
   });
 
@@ -185,7 +211,8 @@ router.get('/tier-breakdown', requireAuth, requireLibrarian, asyncHandler(async 
     points: s.points,
     tierKey: s.tierKey,
     tierName: s.tierName,
-     tierDates: s.tierDates,
+    tierDates: s.tierDates,
+    isTierAwarded: s.isTierAwarded,
   }));
 
   res.json({
@@ -194,6 +221,40 @@ router.get('/tier-breakdown', requireAuth, requireLibrarian, asyncHandler(async 
     tierKeys: tierKeysForResponse,
     students: studentsForResponse,
   });
+}));
+
+router.patch('/tier-award', requireAuth, requireLibrarian, asyncHandler(async (req, res) => {
+  const { studentId, tierKey, awarded } = req.body as {
+    studentId?: string;
+    tierKey?: string;
+    awarded?: boolean;
+  };
+
+  if (!studentId || !tierKey || typeof awarded !== 'boolean') {
+    throw new AppError('studentId, tierKey and awarded are required', 400);
+  }
+
+  const allowedTierKeys = new Set([STARTER_KEY, ...TIER_THRESHOLDS.map((t) => t.key)]);
+  if (!allowedTierKeys.has(tierKey)) {
+    throw new AppError('Invalid tier key', 400);
+  }
+
+  const student = await findUsers({ id: studentId });
+  if (student.length === 0 || student[0].role !== Role.STUDENT) {
+    throw new AppError('Student not found', 404);
+  }
+
+  if (awarded) {
+    await upsertTierAward({
+      userId: studentId,
+      tierKey,
+      awardedById: req.user?.id ?? null,
+    });
+  } else {
+    await deleteTierAward(studentId, tierKey);
+  }
+
+  res.json({ success: true });
 }));
 
 export default router;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { BookOpen, LogOut, Megaphone, Settings, BarChart3, Library, Cog, Award, BarChart2 } from 'lucide-react';
+import { BookOpen, LogOut, Megaphone, Settings, BarChart3, Library, Cog, Award, BarChart2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -64,10 +64,12 @@ export const LibrarianDashboard = () => {
       tierKey: string;
       tierName: string;
       tierDates?: Record<string, string | null>;
+      isTierAwarded?: boolean;
     }[];
   } | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [analyticsAwardSaving, setAnalyticsAwardSaving] = useState<Record<string, boolean>>({});
   const [selectedStudent, setSelectedStudent] = useState<{
     id: string;
     name: string;
@@ -78,6 +80,7 @@ export const LibrarianDashboard = () => {
     tierKey: string;
     tierName: string;
     tierDates?: Record<string, string | null>;
+    isTierAwarded?: boolean;
   } | null>(null);
 
   const analyticsTierColumns = useMemo(
@@ -164,6 +167,150 @@ export const LibrarianDashboard = () => {
       }
       return { key, direction: 'asc' };
     });
+  };
+
+  const handleTierAwardToggle = async (
+    studentId: string,
+    tierKey: string,
+    nextAwarded: boolean,
+  ) => {
+    const awardKey = `${studentId}:${tierKey}`;
+    setAnalyticsAwardSaving((prev) => ({ ...prev, [awardKey]: true }));
+
+    const prevStudents = analyticsData?.students ?? [];
+    setAnalyticsData((prev) => {
+      if (!prev?.students) return prev;
+      return {
+        ...prev,
+        students: prev.students.map((student) =>
+          student.id === studentId
+            ? { ...student, isTierAwarded: nextAwarded }
+            : student
+        ),
+      };
+    });
+
+    try {
+      await api.patch('/api/analytics/tier-award', {
+        studentId,
+        tierKey,
+        awarded: nextAwarded,
+      });
+    } catch (error: any) {
+      setAnalyticsData((prev) => {
+        if (!prev?.students) return prev;
+        return {
+          ...prev,
+          students: prevStudents,
+        };
+      });
+      const message =
+        error.response?.data?.message ||
+        'Failed to update tier award note. Please try again.';
+      alert(message);
+    } finally {
+      setAnalyticsAwardSaving((prev) => ({ ...prev, [awardKey]: false }));
+    }
+  };
+
+  const handlePrintAnalytics = () => {
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const win = window.open('', '_blank', 'noopener,noreferrer');
+    if (!win) {
+      alert('Please allow popups to print analytics.');
+      return;
+    }
+
+    const tierFilterText = analyticsTierFilter
+      ? analyticsTierColumns.find((t) => t.key === analyticsTierFilter)?.name ?? analyticsTierFilter
+      : 'All tiers';
+    const groupedByText =
+      analyticsGroupBy === 'school'
+        ? 'School'
+        : analyticsGroupBy === 'grade'
+          ? 'Grade'
+          : 'Class';
+    const viewText = analyticsView === 'students' ? 'Students per Tier' : 'Tier progression';
+    const searchText = analyticsStudentSearch.trim() || 'None';
+    const generatedAt = new Date().toLocaleString();
+
+    const studentRowsHtml = filteredAnalyticsStudents
+      .map((s) => {
+        const fullName = escapeHtml(`${s.name}${s.surname ? ` ${s.surname}` : ''}`);
+        const gradeClass = escapeHtml(`${s.grade != null ? `Grade ${s.grade}` : 'No grade'}${s.class ? ` • ${s.class}` : ''}`);
+        const isAwarded = s.isTierAwarded ? 'Yes' : 'No';
+        return `<tr>
+          <td>${fullName}</td>
+          <td>${gradeClass}</td>
+          <td>${escapeHtml(s.tierName)}</td>
+          <td>${s.points}</td>
+          <td>${isAwarded}</td>
+        </tr>`;
+      })
+      .join('');
+
+    const progressionHeader = analyticsTierColumns.map((tier) => `<th>${tier.name}</th>`).join('');
+    const progressionRowsHtml = filteredAnalyticsStudents
+      .map((s) => {
+        const fullName = escapeHtml(`${s.name}${s.surname ? ` ${s.surname}` : ''}`);
+        const gradeClass = escapeHtml(`${s.grade != null ? `Grade ${s.grade}` : 'No grade'}${s.class ? ` • ${s.class}` : ''}`);
+        const cells = analyticsTierColumns
+          .map((tier) => {
+            const reached = tier.key === 'starter' ? s.points >= 0 : s.points >= tier.threshold;
+            return `<td>${reached ? 'Yes' : '-'}</td>`;
+          })
+          .join('');
+        return `<tr><td>${fullName}</td><td>${gradeClass}</td>${cells}</tr>`;
+      })
+      .join('');
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>Analytics Print</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+            h1 { margin: 0 0 8px; font-size: 24px; }
+            p.meta { margin: 0 0 4px; font-size: 12px; color: #4b5563; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; font-size: 12px; text-align: left; }
+            th { background: #f3f4f6; }
+            .empty { margin-top: 16px; padding: 12px; border: 1px solid #d1d5db; }
+          </style>
+        </head>
+        <body>
+          <h1>Reading Analytics</h1>
+          <p class="meta">Generated: ${escapeHtml(generatedAt)}</p>
+          <p class="meta">View: ${escapeHtml(viewText)}</p>
+          <p class="meta">Grouped by: ${escapeHtml(groupedByText)}</p>
+          <p class="meta">Tier filter: ${escapeHtml(tierFilterText)}</p>
+          <p class="meta">Name search: ${escapeHtml(searchText)}</p>
+          ${
+            filteredAnalyticsStudents.length === 0
+              ? '<div class="empty">No students found for the current filters.</div>'
+              : analyticsView === 'students'
+                ? `<table>
+                    <thead><tr><th>Student</th><th>Grade / Class</th><th>Tier</th><th>Points</th><th>Awarded in assembly</th></tr></thead>
+                    <tbody>${studentRowsHtml}</tbody>
+                  </table>`
+                : `<table>
+                    <thead><tr><th>Student</th><th>Grade / Class</th>${progressionHeader}</tr></thead>
+                    <tbody>${progressionRowsHtml}</tbody>
+                  </table>`
+          }
+        </body>
+      </html>
+    `);
+    win.document.close();
+    win.focus();
+    win.print();
   };
 
   // Announcement management
@@ -808,7 +955,7 @@ export const LibrarianDashboard = () => {
                 </div>
 
                 {/* Analytics view tabs */}
-                <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <Tabs
                     value={analyticsView}
                     onValueChange={(v) => setAnalyticsView(v as 'students' | 'progression')}
@@ -819,6 +966,16 @@ export const LibrarianDashboard = () => {
                       <TabsTrigger value="progression">Tier progression</TabsTrigger>
                     </TabsList>
                   </Tabs>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="sm:w-auto w-full"
+                    onClick={handlePrintAnalytics}
+                    disabled={analyticsLoading}
+                  >
+                    <Printer className="w-4 h-4 mr-2" />
+                    Print filtered analytics
+                  </Button>
                 </div>
 
                 {/* Students per Tier view */}
@@ -881,6 +1038,11 @@ export const LibrarianDashboard = () => {
                                     (analyticsSort.direction === 'asc' ? ' ↑' : ' ↓')}
                                 </th>
                                 <th
+                                  className="p-3 text-center font-semibold"
+                                >
+                                  Awarded
+                                </th>
+                                <th
                                   className="p-3 text-center font-semibold cursor-pointer select-none"
                                   onClick={() => handleAnalyticsSort('points')}
                                 >
@@ -906,6 +1068,21 @@ export const LibrarianDashboard = () => {
                                     {s.class ? ` • ${s.class}` : ''}
                                   </td>
                                   <td className="p-3 text-center">{s.tierName}</td>
+                                  <td
+                                    className="p-3 text-center"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 accent-primary"
+                                      checked={Boolean(s.isTierAwarded)}
+                                      disabled={Boolean(analyticsAwardSaving[`${s.id}:${s.tierKey}`])}
+                                      onChange={(e) =>
+                                        handleTierAwardToggle(s.id, s.tierKey, e.target.checked)
+                                      }
+                                      aria-label={`Mark ${s.name}${s.surname ? ` ${s.surname}` : ''} as awarded for ${s.tierName}`}
+                                    />
+                                  </td>
                                   <td className="p-3 text-center">{s.points}</td>
                                 </tr>
                               ))}
