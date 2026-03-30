@@ -351,6 +351,8 @@ export const findBooksWithRelations = async (
   where: {
     userId?: string | string[];
     status?: BookStatus;
+    verifiedById?: string;
+    statusIn?: BookStatus[];
   },
   orderBy?: { field: string; order: 'asc' | 'desc' },
   limit?: number
@@ -364,6 +366,7 @@ export const findBooksWithRelations = async (
     'status',
     'lexileLevel',
     'wordCount',
+    'verifiedAt',
   ]);
   const conditions: string[] = [];
   const values: unknown[] = [];
@@ -379,9 +382,18 @@ export const findBooksWithRelations = async (
     }
     paramCount++;
   }
-  if (where.status) {
+  if (where.statusIn && where.statusIn.length > 0) {
+    conditions.push(`b.status::text = ANY($${paramCount}::text[])`);
+    values.push(where.statusIn);
+    paramCount++;
+  } else if (where.status) {
     conditions.push(`b.status = $${paramCount}`);
     values.push(where.status);
+    paramCount++;
+  }
+  if (where.verifiedById) {
+    conditions.push(`b."verifiedById" = $${paramCount}`);
+    values.push(where.verifiedById);
     paramCount++;
   }
 

@@ -12,13 +12,26 @@ import { api } from '@/lib/api';
 import { CommentModal } from '../teacher/CommentModal';
 import { LibraryManagementModal } from '@/components/LibraryManagementModal';
 import { ApproveBookModal } from '@/components/ApproveBookModal';
+import {
+  EditVerifiedBookModal,
+  type EditVerifiedBookModalBook,
+} from '@/components/EditVerifiedBookModal';
 import { useSearchParams } from 'react-router-dom';
 import { MILESTONES } from '@/lib/reading-tiers';
 import { LexileManagementContent } from './LexileManagement';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, BookOpen as BookIcon } from 'lucide-react';
 
-const VALID_TABS = ['books', 'verification', 'announcements', 'lexile', 'certificates', 'analytics', 'management'];
+const VALID_TABS = [
+  'books',
+  'verification',
+  'verified',
+  'announcements',
+  'lexile',
+  'certificates',
+  'analytics',
+  'management',
+];
 
 export const LibrarianDashboard = () => {
   const { logout } = useAuth();
@@ -37,11 +50,13 @@ export const LibrarianDashboard = () => {
   const [books, setBooks] = useState([]);
   const [filteredBooks, setFilteredBooks] = useState([]);
   const [pendingBooks, setPendingBooks] = useState([]);
+  const [verifiedByMeBooks, setVerifiedByMeBooks] = useState<EditVerifiedBookModalBook[]>([]);
   const [announcements, setAnnouncements] = useState([]);
   const [selectedBook, setSelectedBook] = useState<string | null>(null);
   const [editingBook, setEditingBook] = useState<any | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [approvingBook, setApprovingBook] = useState<any | null>(null);
+  const [editVerifiedBook, setEditVerifiedBook] = useState<EditVerifiedBookModalBook | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGrade, setFilterGrade] = useState('');
   const [filterClass, setFilterClass] = useState('');
@@ -389,15 +404,19 @@ export const LibrarianDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [booksRes, pendingRes, announcementsRes] = await Promise.all([
+      const [booksRes, pendingRes, verifiedRes, announcementsRes] = await Promise.all([
         api.get('/api/books'),
         api.get('/api/books', { params: { status: 'PENDING' } }),
+        api.get('/api/books', {
+          params: { verifiedByMe: 'true', sortBy: 'verifiedAt', order: 'desc' },
+        }),
         api.get('/api/announcements'),
       ]);
 
       setBooks(booksRes.data);
       setFilteredBooks(booksRes.data);
       setPendingBooks(pendingRes.data);
+      setVerifiedByMeBooks(verifiedRes.data);
       setAnnouncements(announcementsRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -605,6 +624,7 @@ export const LibrarianDashboard = () => {
                   </span>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="verified">Verified books</TabsTrigger>
               <TabsTrigger value="announcements">Announcements</TabsTrigger>
               <TabsTrigger value="lexile">
                 <BarChart3 className="w-4 h-4 mr-1.5" />
@@ -784,6 +804,87 @@ export const LibrarianDashboard = () => {
                                   onClick={() => handleEditBook(book)}
                                 >
                                   Edit Book
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="verified">
+            <Card>
+              <CardHeader>
+                <CardTitle>Books you verified</CardTitle>
+                <p className="text-sm text-muted-foreground font-normal">
+                  Approved or rejected logs where you were the verifier. You can change the decision, points, librarian
+                  note, or the student&apos;s reflection text.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {verifiedByMeBooks.length === 0 ? (
+                  <div className="rounded-md border border-muted bg-muted/30 p-6 text-center text-muted-foreground">
+                    You have not verified or denied any books yet.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="p-4 text-left font-semibold">Title</th>
+                          <th className="p-4 text-left font-semibold">Student</th>
+                          <th className="p-4 text-left font-semibold">Decision</th>
+                          <th className="p-4 text-left font-semibold">Points</th>
+                          <th className="p-4 text-left font-semibold">Verified</th>
+                          <th className="p-4 text-left font-semibold">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {verifiedByMeBooks.map((book) => (
+                          <tr key={book.id} className="border-b hover:bg-gray-50">
+                            <td className="p-4 align-top">
+                              <div>
+                                <p className="font-semibold">{book.title}</p>
+                                <p className="text-xs text-muted-foreground">{book.author}</p>
+                              </div>
+                            </td>
+                            <td className="p-4 align-top">
+                              <p className="text-sm font-medium">{book.user?.name ?? '—'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {book.user?.grade != null
+                                  ? `Grade ${book.user.grade}${book.user.class ?? ''}`
+                                  : ''}
+                              </p>
+                            </td>
+                            <td className="p-4 align-top">
+                              <span
+                                className={
+                                  book.status === 'APPROVED'
+                                    ? 'inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800'
+                                    : 'inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-800'
+                                }
+                              >
+                                {book.status === 'APPROVED' ? 'Approved' : 'Rejected'}
+                              </span>
+                            </td>
+                            <td className="p-4 align-top text-sm">
+                              {book.status === 'APPROVED' ? book.pointsAwardedValue ?? 0 : '—'}
+                            </td>
+                            <td className="p-4 align-top text-sm">
+                              {book.verifiedAt ? new Date(book.verifiedAt).toLocaleString() : '—'}
+                            </td>
+                            <td className="p-4 align-top">
+                              <div className="flex flex-wrap gap-2">
+                                <Button size="sm" onClick={() => setEditVerifiedBook(book)}>
+                                  Edit verification
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => setSelectedBook(book.id)}>
+                                  Comments
                                 </Button>
                               </div>
                             </td>
@@ -1285,6 +1386,13 @@ export const LibrarianDashboard = () => {
         isOpen={!!approvingBook}
         onClose={() => setApprovingBook(null)}
         onApproved={handleBookApproved}
+      />
+
+      <EditVerifiedBookModal
+        book={editVerifiedBook}
+        isOpen={!!editVerifiedBook}
+        onClose={() => setEditVerifiedBook(null)}
+        onSaved={fetchData}
       />
 
       {/* Student analytics detail modal */}

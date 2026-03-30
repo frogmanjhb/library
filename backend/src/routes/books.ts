@@ -27,8 +27,15 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   const user = req.user!;
   const { userId, grade, class: className, sortBy = 'createdAt', order = 'desc', status } = req.query;
   const statusParam = Array.isArray(status) ? status[0] : status;
+  const verifiedByMeRaw = req.query.verifiedByMe;
+  const verifiedByMeParam = Array.isArray(verifiedByMeRaw) ? verifiedByMeRaw[0] : verifiedByMeRaw;
+  const isVerifiedByMeList = verifiedByMeParam === 'true';
 
-  if (statusParam) {
+  if (isVerifiedByMeList && user.role !== Role.LIBRARIAN) {
+    throw new AppError('Access denied', 403);
+  }
+
+  if (statusParam && !isVerifiedByMeList) {
     const normalizedStatus = statusParam.toUpperCase();
     if (!Object.values(BookStatus).includes(normalizedStatus as BookStatus)) {
       throw new AppError('Invalid status filter', 400);
@@ -37,7 +44,12 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
   }
 
   // Build where clause for books
-  let bookWhere: { userId?: string | string[]; status?: BookStatus } = {};
+  let bookWhere: {
+    userId?: string | string[];
+    status?: BookStatus;
+    verifiedById?: string;
+    statusIn?: BookStatus[];
+  } = {};
   let teacherStudentIds: string[] | null = null;
 
   const allowedSortBy = new Set([
@@ -49,6 +61,7 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
     'status',
     'lexileLevel',
     'wordCount',
+    'verifiedAt',
   ]);
   const sortField = String(sortBy);
   if (!allowedSortBy.has(sortField)) {
@@ -136,8 +149,14 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
     }
   }
 
-  if (statusParam) {
+  if (statusParam && !isVerifiedByMeList) {
     bookWhere.status = statusParam as BookStatus;
+  }
+
+  if (isVerifiedByMeList) {
+    bookWhere.verifiedById = user.id;
+    bookWhere.statusIn = [BookStatus.APPROVED, BookStatus.REJECTED];
+    delete bookWhere.status;
   }
 
   let books = await findBooksWithRelations(
@@ -147,6 +166,20 @@ router.get('/', requireAuth, asyncHandler(async (req, res) => {
 
   // When returning PENDING books, enrich with student lexile for librarian scoring context
   if (statusParam === 'PENDING' && books.length > 0) {
+    const uniqueUserIds = [...new Set(books.map((b) => b.userId))];
+    const lexileMap: Record<string, number | null> = {};
+    for (const uid of uniqueUserIds) {
+      lexileMap[uid] = await getStudentCurrentLexile(uid);
+    }
+    for (const book of books) {
+      if (book.user) {
+        (book.user as { currentLexile?: number | null }).currentLexile = lexileMap[book.userId] ?? null;
+      }
+    }
+  }
+
+  // Librarian "verified by me" list: same lexile context for edits
+  if (isVerifiedByMeList && books.length > 0) {
     const uniqueUserIds = [...new Set(books.map((b) => b.userId))];
     const lexileMap: Record<string, number | null> = {};
     for (const uid of uniqueUserIds) {
